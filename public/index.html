@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Product Transactions</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --surface: #fff; --text: #1a1f36; --muted: #697386; --border: #e3e8ee;
+    --accent: #635bff; --accent-soft: #eeedff; --ok: #0e7c4a; --warn: #a15c07; --err: #c0123c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1218; --surface: #171b24; --text: #e6e9ef; --muted: #8b93a7; --border: #262c38;
+      --accent: #8c86ff; --accent-soft: #24223f; --ok: #4cc38a; --warn: #e3a54a; --err: #ff6b8a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 24px 16px 48px; }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; justify-content: space-between; margin-bottom: 20px; }
+  h1 { font-size: 20px; margin: 0; }
+  .badge { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; padding: 2px 8px; border-radius: 99px; margin-left: 8px; vertical-align: middle; }
+  .badge.test { background: #fff1d6; color: #8a5300; } .badge.live { background: #d7f7e6; color: #0b6b3f; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  select, input[type=search], button { font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; }
+  button { cursor: pointer; } button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .logout { margin: 0; } .logout button { width: 100%; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .chip { border: 1px solid var(--border); background: var(--surface); border-radius: 99px; padding: 5px 12px; cursor: pointer; user-select: none; }
+  .chip.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .kpi .label { color: var(--muted); font-size: 12px; }
+  .kpi .value { font-size: 22px; font-weight: 650; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .table-scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th { font-size: 12px; color: var(--muted); font-weight: 600; background: var(--surface); position: sticky; top: 0; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tr:last-child td { border-bottom: 0; }
+  tbody tr:hover { background: var(--bg); }
+  a { color: var(--accent); text-decoration: none; } a:hover { text-decoration: underline; }
+  .c-qty-inline { display: none; color: var(--muted); font-weight: 400; }
+  @media (max-width: 640px) { .c-qty-inline { display: inline; } }
+  .tag { font-size: 12px; padding: 1px 8px; border-radius: 6px; background: var(--bg); border: 1px solid var(--border); }
+  .status-paid { color: var(--ok); } .status-unpaid { color: var(--warn); }
+  .empty, .error { padding: 32px; text-align: center; color: var(--muted); }
+  .error { color: var(--err); }
+  .meta { color: var(--muted); font-size: 12px; margin-top: 10px; }
+  dialog { border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text); width: min(560px, calc(100vw - 32px)); padding: 0; }
+  dialog::backdrop { background: rgba(0,0,0,.35); }
+  .dlg-head, .dlg-foot { padding: 14px 18px; display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+  .dlg-head { border-bottom: 1px solid var(--border); } .dlg-foot { border-top: 1px solid var(--border); justify-content: flex-end; }
+  .dlg-body { max-height: 55vh; overflow: auto; padding: 8px 18px; }
+  .dlg-body label { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); cursor: pointer; }
+  .dlg-body code { color: var(--muted); font-size: 12px; margin-left: auto; }
+
+  /* ----- phones ----- */
+  @media (max-width: 640px) {
+    .wrap { padding: 16px 16px 40px; }
+    header { flex-direction: column; align-items: stretch; }
+    h1 { font-size: 18px; }
+    .controls { display: grid; grid-template-columns: 1fr 1fr; }
+    .controls input[type=search] { grid-column: 1 / -1; order: -1; }
+    #days, .logout { grid-column: 1 / -1; }
+    select, input[type=search], button { padding: 10px 12px; font-size: 16px; } /* 16px stops iOS zoom */
+    .chips { flex-wrap: nowrap; overflow-x: auto; margin: 0 -16px 16px; padding: 0 16px; scrollbar-width: none; }
+    .chip { white-space: nowrap; padding: 7px 14px; }
+    .kpis { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .kpi { padding: 12px; }
+    .kpi .value { font-size: 18px; overflow-wrap: anywhere; }
+    .kpi:first-child { grid-column: 1 / -1; }
+
+    /* table -> stacked cards */
+    .card { background: none; border: 0; }
+    thead { display: none; }
+    table, tbody, tr, td { display: block; width: 100%; }
+    tbody tr { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; }
+    tbody tr:hover { background: var(--surface); }
+    td { padding: 0; border: 0; white-space: normal; text-align: left; }
+    td.c-product { grid-area: 1 / 1; font-weight: 600; }
+    td.c-amount { grid-area: 1 / 2; font-weight: 650; font-size: 15px; text-align: right; }
+    td.c-customer { grid-area: 2 / 1; }
+    td.c-status { grid-area: 2 / 2; text-align: right; font-size: 13px; }
+    td.c-date { grid-area: 3 / 1 / 4 / 3; }
+    td.c-customer, td.c-date { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+    td.c-qty { display: none; }
+    td.c-type { grid-area: 4 / 1; margin-top: 8px; }
+    td.c-link { grid-area: 4 / 2; text-align: right; margin-top: 8px; align-self: center; }
+    td.c-link a { display: inline-block; padding: 4px 0; }
+    .empty, .error { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px 16px; }
+    dialog { max-height: calc(100vh - 32px); }
+    .dlg-head { flex-wrap: wrap; } .dlg-head input { flex: 1; min-width: 0; font-size: 16px; }
+    .dlg-body code { display: none; }
+    .dlg-body label { padding: 12px 0; }
+    .dlg-foot button { flex: 1; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Product Transactions <span id="mode" class="badge" hidden></span></h1>
+    <div class="controls">
+      <select id="days" aria-label="Date range">
+        <option value="1">Last 24 hours</option>
+        <option value="7">Last 7 days</option>
+        <option value="30" selected>Last 30 days</option>
+        <option value="90">Last 90 days</option>
+        <option value="365">Last 12 months</option>
+      </select>
+      <input id="q" type="search" placeholder="Search customer…" aria-label="Search customer">
+      <button id="refresh">Refresh</button>
+      <button id="manage" class="primary">Choose products</button>
+      <form method="post" action="/logout" class="logout"><button type="submit">Sign out</button></form>
+    </div>
+  </header>
+
+  <div id="chips" class="chips"></div>
+  <div id="kpis" class="kpis"></div>
+  <div class="card">
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Date</th><th>Product</th><th>Customer</th><th class="num">Qty</th><th class="num">Amount</th><th>Type</th><th>Status</th><th></th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div id="state" class="empty">Loading…</div>
+  </div>
+  <div id="meta" class="meta"></div>
+</div>
+
+<dialog id="dlg">
+  <div class="dlg-head"><strong>Products to track</strong><input id="dlgq" type="search" placeholder="Filter…"></div>
+  <div id="dlgbody" class="dlg-body"></div>
+  <div class="dlg-foot"><button id="dlgcancel">Cancel</button><button id="dlgsave" class="primary">Save</button></div>
+</dialog>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let data = null;
+let active = new Set();          // product ids currently shown (empty = all tracked)
+let timer;
+
+const fmtMoney = (cents, cur) => new Intl.NumberFormat(undefined, { style: 'currency', currency: cur.toUpperCase() }).format(cents / 100);
+const fmtDate = (s) => new Date(s * 1000).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+async function load(refresh = false) {
+  $('state').hidden = false; $('state').className = 'empty'; $('state').textContent = 'Loading…';
+  try {
+    const res = await fetch(`/api/transactions?days=${$('days').value}${refresh ? '&refresh=1' : ''}`);
+    if (res.status === 401) return location.assign('/login');
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error);
+    data = body;
+    active = new Set([...active].filter((id) => data.products.some((p) => p.id === id)));
+    render();
+  } catch (e) {
+    $('rows').innerHTML = ''; $('kpis').innerHTML = ''; $('chips').innerHTML = '';
+    $('state').className = 'error'; $('state').textContent = e.message;
+  }
+}
+
+function render() {
+  const mode = $('mode');
+  mode.hidden = false; mode.className = `badge ${data.mode}`; mode.textContent = data.mode === 'test' ? 'Test mode' : 'Live';
+
+  $('chips').innerHTML = data.products.map((p) =>
+    `<span class="chip ${active.has(p.id) ? 'on' : ''}" data-id="${esc(p.id)}" title="${esc(p.id)}">${esc(p.name)}</span>`).join('');
+
+  const q = $('q').value.trim().toLowerCase();
+  const rows = data.rows.filter((r) => (!active.size || active.has(r.product_id)) && (!q || r.customer.toLowerCase().includes(q)));
+
+  // KPIs: totals per currency so mixed-currency accounts stay correct.
+  const totals = {};
+  for (const r of rows) totals[r.currency] = (totals[r.currency] || 0) + r.amount;
+  const revenue = Object.entries(totals).map(([c, v]) => fmtMoney(v, c)).join(' · ') || '—';
+  const customers = new Set(rows.map((r) => r.customer).filter((c) => c !== '—')).size;
+  const units = rows.reduce((n, r) => n + (r.quantity || 0), 0);
+  $('kpis').innerHTML = [
+    ['Revenue', revenue], ['Transactions', rows.length], ['Units sold', units], ['Customers', customers],
+  ].map(([l, v]) => `<div class="kpi"><div class="label">${l}</div><div class="value">${esc(v)}</div></div>`).join('');
+
+  $('rows').innerHTML = rows.map((r) => `<tr>
+      <td class="c-date">${fmtDate(r.created)}</td>
+      <td class="c-product">${esc(r.product)}${r.quantity > 1 ? ` <span class="c-qty-inline">×${r.quantity}</span>` : ''}</td>
+      <td class="c-customer">${esc(r.customer)}</td>
+      <td class="num c-qty">${r.quantity ?? ''}</td>
+      <td class="num c-amount">${fmtMoney(r.amount, r.currency)}</td>
+      <td class="c-type"><span class="tag">${esc(r.source)}</span></td>
+      <td class="c-status status-${esc(r.status)}">${esc(r.status)}</td>
+      <td class="c-link"><a href="${esc(r.url)}" target="_blank" rel="noopener">View ↗</a></td>
+    </tr>`).join('');
+
+  $('state').hidden = rows.length > 0;
+  $('state').className = 'empty';
+  $('state').textContent = !data.products.length
+    ? 'No products selected yet — click “Choose products” to pick which ones to track.'
+    : 'No transactions for the selected products in this period.';
+
+  $('meta').textContent = `Updated ${new Date(data.fetched_at).toLocaleTimeString()} · auto-refreshes every minute` +
+    (data.truncated ? ' · Showing the most recent 1,000 records per source; narrow the date range for complete totals.' : '');
+}
+
+$('chips').addEventListener('click', (e) => {
+  const id = e.target.dataset?.id; if (!id) return;
+  active.has(id) ? active.delete(id) : active.add(id);
+  render();
+});
+$('days').addEventListener('change', () => load());
+$('refresh').addEventListener('click', () => load(true));
+$('q').addEventListener('input', () => data && render());
+
+// ----- product picker -----
+let catalog = [];
+$('manage').addEventListener('click', async () => {
+  $('dlgbody').innerHTML = '<p class="empty">Loading products…</p>';
+  $('dlg').showModal();
+  try {
+    const res = await fetch('/api/catalog');
+    if (res.status === 401) return location.assign('/login');
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error);
+    catalog = body.products;
+    const sel = new Set(body.selected);
+    $('dlgbody').innerHTML = catalog.length ? catalog.map((p) =>
+      `<label data-name="${esc(p.name.toLowerCase())}"><input type="checkbox" value="${esc(p.id)}" ${sel.has(p.id) ? 'checked' : ''}>${esc(p.name)}<code>${esc(p.id)}</code></label>`).join('')
+      : '<p class="empty">No active products found in this Stripe account.</p>';
+  } catch (e) { $('dlgbody').innerHTML = `<p class="error">${esc(e.message)}</p>`; }
+});
+$('dlgq').addEventListener('input', (e) => {
+  const q = e.target.value.toLowerCase();
+  document.querySelectorAll('#dlgbody label').forEach((l) => { l.hidden = q && !l.dataset.name.includes(q); });
+});
+$('dlgcancel').addEventListener('click', () => $('dlg').close());
+$('dlgsave').addEventListener('click', async () => {
+  const ids = [...document.querySelectorAll('#dlgbody input:checked')].map((i) => i.value);
+  const res = await fetch('/api/products', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(ids) });
+  if (res.status === 401) return location.assign('/login');
+  if (!res.ok) return alert((await res.json()).error);
+  $('dlg').close(); load(true);
+});
+
+load();
+timer = setInterval(() => load(), 60_000);
+</script>
+</body>
+</html>

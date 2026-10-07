@@ -1,0 +1,10 @@
+{
+  "name": "stripe-product-transactions",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local dashboard showing the latest Stripe transactions for selected products",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": { "node": ">=18" }
+}

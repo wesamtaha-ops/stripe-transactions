@@ -7,7 +7,8 @@ No dependencies — just Node 18+.
 
 1. Create a **restricted key** in Stripe: Dashboard → Developers → API keys → *Create restricted key*.
    Give it **Read** access to: Checkout Sessions, Invoices, Products (everything else: None).
-2. `cp .env.example .env` and paste the key into `STRIPE_SECRET_KEY`.
+2. `cp .env.example .env`, paste the key into `STRIPE_SECRET_KEY`, and set `DASHBOARD_USER` /
+   `DASHBOARD_PASSWORD` — the browser will ask for these when you open the dashboard.
 3. `npm start`, then open http://localhost:4242
 4. Click **Choose products** and tick the products to track (saved to `products.json`).
 
@@ -21,3 +22,6 @@ information, so they can't be attributed to a product and are not shown.
 
 The key stays on the server (bound to 127.0.0.1); the browser only sees the filtered results.
 # stripe-transactions
+
+The dashboard and API are protected by HTTP Basic auth. Basic auth sends the password with every
+request, so if you ever host this beyond localhost, put it behind HTTPS.
