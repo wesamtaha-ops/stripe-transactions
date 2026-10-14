@@ -33,5 +33,8 @@ The key stays on the server (bound to 127.0.0.1); the browser only sees the filt
 # stripe-transactions
 
 The dashboard and API are protected by a sign-in page (`DASHBOARD_USER` / `DASHBOARD_PASSWORD`).
+Add more users with `_2`, `_3`, … suffixes. `DASHBOARD_SCOPE` limits what a user sees by product
+name prefix — `only:Sentink Plus` shows just that group, `hide:Sentink Plus` shows everything else.
+Scopes are enforced on the server, including refunds and the tracked-products list.
 Sessions last 12 hours and 5 failed attempts lock an IP out for 15 minutes. If you ever host this
 beyond localhost, put it behind HTTPS.

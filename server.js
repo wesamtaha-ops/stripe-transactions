@@ -12,10 +12,9 @@ loadEnv(path.join(ROOT, '.env'));
 const PORT = Number(process.env.PORT || 4242);
 const HOST = '127.0.0.1';
 const STRIPE_KEY = process.env.STRIPE_SECRET_KEY || '';
-const AUTH_USER = process.env.DASHBOARD_USER || '';
-const AUTH_PASS = process.env.DASHBOARD_PASSWORD || '';
+const USERS = loadUsers();
 
-if (!AUTH_USER || !AUTH_PASS) {
+if (!USERS.length) {
   console.error('DASHBOARD_USER and DASHBOARD_PASSWORD must be set in .env (see .env.example).');
   process.exit(1);
 }
@@ -34,6 +33,40 @@ function loadEnv(file) {
     const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/i);
     if (m && !(m[1] in process.env)) process.env[m[1]] = m[2].replace(/^['"]|['"]$/g, '');
   }
+}
+
+// Users come from .env: DASHBOARD_USER / DASHBOARD_PASSWORD / DASHBOARD_SCOPE, then the same
+// names with _2, _3, ... for more users. A scope limits which products a user can see:
+//   only:<name prefix>  -> only products whose name starts with the prefix
+//   hide:<name prefix>  -> everything except those products
+//   (empty)             -> everything
+function loadUsers() {
+  const users = [];
+  for (let i = 1; i <= 20; i++) {
+    const sfx = i === 1 ? '' : `_${i}`;
+    const name = process.env[`DASHBOARD_USER${sfx}`];
+    const pass = process.env[`DASHBOARD_PASSWORD${sfx}`];
+    if (!name || !pass) continue;
+    const m = (process.env[`DASHBOARD_SCOPE${sfx}`] || '').match(/^\s*(only|hide)\s*:\s*(.+?)\s*$/i);
+    users.push({ name, pass, scope: m ? { mode: m[1].toLowerCase(), prefix: m[2].toLowerCase(), label: m[2] } : null });
+  }
+  return users;
+}
+
+// Whether a user may see something sold under these product names.
+function visible(user, productNames) {
+  if (!user.scope) return true;
+  const inGroup = productNames.some((n) => String(n || '').toLowerCase().startsWith(user.scope.prefix));
+  return user.scope.mode === 'only' ? inGroup : !inGroup;
+}
+
+function scopeFor(user, data) {
+  return {
+    ...data,
+    rows: data.rows.filter((r) => visible(user, r.product_names)),
+    tracked: data.tracked.filter((p) => visible(user, [p.name])),
+    user: { name: user.name, scope: user.scope && `${user.scope.mode === 'only' ? 'Only' : 'Excluding'} ${user.scope.label}` },
+  };
 }
 
 function readProducts() {
@@ -145,6 +178,7 @@ async function getTransactions(days, force) {
   const addPayment = (pi, row) => {
     const charge = pi && chargeByPI.get(pi);
     row.kind = 'payment';
+    row.product_names = [row.product];
     row.payment_intent = pi || null;
     row.status = refundStatus(charge) || row.status;
     row.refunded_amount = charge?.amount_refunded || 0;
@@ -245,7 +279,11 @@ async function getTransactions(days, force) {
     if (ok) {
       addPayment(p.id, row);
     } else {
-      rows.push({ ...row, kind: 'failed', refunded_amount: 0, payment_intent: p.id, tracked: originals.some((o) => tracked.has(o.product_id)) });
+      rows.push({
+        ...row, kind: 'failed', refunded_amount: 0, payment_intent: p.id,
+        product_names: originals.length ? originals.map((o) => o.product) : [row.product],
+        tracked: originals.some((o) => tracked.has(o.product_id)),
+      });
     }
   }
 
@@ -269,6 +307,7 @@ async function getTransactions(days, force) {
       status: r.status === 'succeeded' ? 'refund' : `refund ${r.status}`,
       source: 'Refund',
       tracked: originals.some((o) => tracked.has(o.product_id)),
+      product_names: originals.length ? originals.map((o) => o.product) : ['Refund'],
       url: pi ? dashLink('payments', pi) : dashLink('refunds', r.id),
     });
   }
@@ -295,18 +334,23 @@ function safeEqual(a, b) {
   return crypto.timingSafeEqual(h(a), h(b));
 }
 
-function checkCredentials(user, pass) {
-  // Evaluate both so a wrong username takes as long as a wrong password.
-  const userOk = safeEqual(user, AUTH_USER);
-  const passOk = safeEqual(pass, AUTH_PASS);
-  return userOk && passOk;
+// Returns the matching user or null. Checks every user and both fields so timing
+// doesn't reveal which usernames exist.
+function checkCredentials(name, pass) {
+  let match = null;
+  for (const u of USERS) {
+    const userOk = safeEqual(name, u.name);
+    const passOk = safeEqual(pass, u.pass);
+    if (userOk && passOk && !match) match = u;
+  }
+  return match;
 }
 
 // ----- sessions (in memory: restarting the server signs everyone out) -----
 
 const SESSION_COOKIE = 'sid';
 const SESSION_MS = 12 * 60 * 60 * 1000;
-const sessions = new Map(); // token -> expiry timestamp
+const sessions = new Map(); // token -> { exp, user }
 
 function getCookie(req, name) {
   for (const part of (req.headers.cookie || '').split(';')) {
@@ -316,15 +360,16 @@ function getCookie(req, name) {
   return '';
 }
 
-function hasSession(req) {
+// The signed-in user for this request, or null.
+function sessionUser(req) {
   const token = getCookie(req, SESSION_COOKIE);
-  const exp = token && sessions.get(token);
-  if (!exp) return false;
-  if (exp < Date.now()) {
+  const s = token && sessions.get(token);
+  if (!s) return null;
+  if (s.exp < Date.now()) {
     sessions.delete(token);
-    return false;
+    return null;
   }
-  return true;
+  return s.user;
 }
 
 function cookieHeader(req, value, maxAgeSec) {
@@ -385,7 +430,7 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   try {
     if (url.pathname === '/login' && req.method === 'GET') {
-      if (hasSession(req)) return redirect(res, '/');
+      if (sessionUser(req)) return redirect(res, '/');
       return send(res, 200, loginPage(), 'text/html; charset=utf-8');
     }
     if (url.pathname === '/login' && req.method === 'POST') {
@@ -394,20 +439,22 @@ const server = http.createServer(async (req, res) => {
         return send(res, 429, loginPage('Too many failed attempts. Try again in 15 minutes.'), 'text/html; charset=utf-8');
       }
       const form = new URLSearchParams(await readBody(req));
-      if (!checkCredentials(form.get('username') || '', form.get('password') || '')) {
+      const user = checkCredentials(form.get('username') || '', form.get('password') || '');
+      if (!user) {
         recordFailure(ip);
         return send(res, 401, loginPage('Incorrect username or password.'), 'text/html; charset=utf-8');
       }
       failures.delete(ip);
       const token = crypto.randomBytes(32).toString('hex');
-      sessions.set(token, Date.now() + SESSION_MS);
+      sessions.set(token, { exp: Date.now() + SESSION_MS, user });
       return redirect(res, '/', { 'Set-Cookie': cookieHeader(req, token, SESSION_MS / 1000) });
     }
     if (url.pathname === '/logout' && req.method === 'POST') {
       sessions.delete(getCookie(req, SESSION_COOKIE));
       return redirect(res, '/login', { 'Set-Cookie': cookieHeader(req, '', 0) });
     }
-    if (!hasSession(req)) {
+    const user = sessionUser(req);
+    if (!user) {
       if (url.pathname.startsWith('/api/')) return send(res, 401, { error: 'Not signed in' });
       return redirect(res, '/login');
     }
@@ -421,18 +468,24 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === '/api/transactions' && req.method === 'GET') {
       const raw = url.searchParams.get('days');
       const days = raw === 'all' ? 0 : Math.min(Math.max(Number(raw) || 30, 1), 365);
-      return send(res, 200, await getTransactions(days, url.searchParams.has('refresh')));
+      return send(res, 200, scopeFor(user, await getTransactions(days, url.searchParams.has('refresh'))));
     }
     if (url.pathname === '/api/catalog' && req.method === 'GET') {
       const all = await listAll('/v1/products', { active: true });
-      return send(res, 200, { products: all.map((p) => ({ id: p.id, name: p.name })), selected: readProducts() });
+      const products = all.filter((p) => visible(user, [p.name])).map((p) => ({ id: p.id, name: p.name }));
+      const allowed = new Set(products.map((p) => p.id));
+      return send(res, 200, { products, selected: readProducts().filter((id) => allowed.has(id)) });
     }
     if (url.pathname === '/api/products' && req.method === 'PUT') {
       const ids = JSON.parse(await readBody(req));
       if (!Array.isArray(ids) || !ids.every((id) => typeof id === 'string' && /^prod_\w+$/.test(id))) {
         return send(res, 400, { error: 'Expected an array of product IDs (prod_...)' });
       }
-      writeProducts(ids);
+      // Only change the user's own slice of the tracked list; keep products they can't see.
+      const all = await listAll('/v1/products', {});
+      const allowed = new Set(all.filter((p) => visible(user, [p.name])).map((p) => p.id));
+      if (ids.some((id) => !allowed.has(id))) return send(res, 403, { error: 'Not allowed to track that product' });
+      writeProducts([...readProducts().filter((id) => !allowed.has(id)), ...ids]);
       cache.data = null;
       return send(res, 200, { ok: true, selected: ids });
     }
