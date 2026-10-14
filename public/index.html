@@ -47,7 +47,10 @@
   @media (max-width: 640px) { .c-qty-inline { display: inline; } }
   .tag { font-size: 12px; padding: 1px 8px; border-radius: 6px; background: var(--bg); border: 1px solid var(--border); }
   .status-paid { color: var(--ok); } .status-unpaid, .status-partially-refunded { color: var(--warn); }
-  .status-refunded, .status-refund { color: var(--err); }
+  .status-refunded, .status-refund, .status-failed { color: var(--err); }
+  .status-canceled { color: var(--muted); }
+  tr.unpaid td:not(.c-link):not(.c-status) { opacity: .55; }
+  tr.unpaid td.c-amount { text-decoration: line-through; }
   td.neg { color: var(--err); }
   .refund-note { display: block; color: var(--err); font-size: 12px; font-weight: 400; }
   .empty, .error { padding: 32px; text-align: center; color: var(--muted); }
@@ -116,6 +119,7 @@
         <option value="30" selected>Last 30 days</option>
         <option value="90">Last 90 days</option>
         <option value="365">Last 12 months</option>
+        <option value="all">All time</option>
       </select>
       <select id="view" aria-label="Which products">
         <option value="all">All products</option>
@@ -125,6 +129,7 @@
         <option value="all">All types</option>
         <option value="payment">Payments</option>
         <option value="refund">Refunds</option>
+        <option value="failed">Failed / canceled</option>
       </select>
       <input id="q" type="search" placeholder="Search customer…" aria-label="Search customer">
       <button id="refresh">Refresh</button>
@@ -209,13 +214,14 @@ function render() {
     for (const r of list) t[r.currency] = (t[r.currency] || 0) + r.amount;
     return Object.entries(t).map(([c, v]) => fmtMoney(v, c)).join('\n') || '—';
   };
+  // Failed/canceled payments are listed but never counted as money.
   const payments = rows.filter((r) => r.kind === 'payment');
   const refunds = rows.filter((r) => r.kind === 'refund');
   $('kpis').innerHTML = [
-    ['Net revenue', sum(rows)], ['Gross sales', sum(payments)], ['Refunds', refunds.length ? sum(refunds) : '—'], ['Payments', payments.length],
+    ['Net revenue', sum([...payments, ...refunds])], ['Gross sales', sum(payments)], ['Refunds', refunds.length ? sum(refunds) : '—'], ['Payments', payments.length],
   ].map(([l, v]) => `<div class="kpi"><div class="label">${l}</div><div class="value">${esc(v)}</div></div>`).join('');
 
-  $('rows').innerHTML = rows.map((r) => `<tr>
+  $('rows').innerHTML = rows.map((r) => `<tr${r.kind === 'failed' ? ' class="unpaid"' : ''}>
       <td class="c-date">${fmtDate(r.created)}</td>
       <td class="c-product">${esc(r.product)}${r.quantity > 1 ? ` <span class="c-qty-inline">×${r.quantity}</span>` : ''}</td>
       <td class="c-customer">${esc(r.customer)}</td>

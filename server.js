@@ -116,17 +116,18 @@ async function getTransactions(days, force) {
   if (!force && cache.data && cache.key === key && Date.now() - cache.at < CACHE_MS) return cache.data;
 
   const tracked = new Set(productIds);
-  const since = Math.floor(Date.now() / 1000) - days * 86400;
+  const since = days ? Math.floor(Date.now() / 1000) - days * 86400 : 0; // 0 days = all time
 
-  const [sessions, invoices, charges, refunds, products] = await Promise.all([
+  const [sessions, invoices, charges, refunds, intents, products] = await Promise.all([
     listAll('/v1/checkout/sessions', {
       status: 'complete',
       'created[gte]': since,
       'expand[]': ['data.line_items'],
     }),
-    listAll('/v1/invoices', { status: 'paid', 'created[gte]': since, 'expand[]': ['data.payments'] }),
+    listAll('/v1/invoices', { 'created[gte]': since, 'expand[]': ['data.payments'] }),
     listAll('/v1/charges', { 'created[gte]': since }),
     listAll('/v1/refunds', { 'created[gte]': since }),
+    listAll('/v1/payment_intents', { 'created[gte]': since }),
     listAll('/v1/products', {}),
   ]);
 
@@ -134,6 +135,9 @@ async function getTransactions(days, force) {
   // so fall back to the line item description for their name.
   const names = Object.fromEntries(products.map((p) => [p.id, p.name]));
   const chargeByPI = new Map(charges.map((c) => [idOf(c.payment_intent), c]));
+  const invoicePI = (inv) =>
+    idOf(inv.payments?.data?.find((p) => p.payment?.payment_intent)?.payment?.payment_intent ?? inv.payment_intent);
+  const invoiceByPI = new Map(invoices.map((inv) => [invoicePI(inv), inv]).filter(([pi]) => pi));
   const rows = [];
   const rowsByPI = new Map(); // payment_intent -> payment rows, used to label refunds
   const paymentCheckoutInvoices = new Set();
@@ -141,6 +145,7 @@ async function getTransactions(days, force) {
   const addPayment = (pi, row) => {
     const charge = pi && chargeByPI.get(pi);
     row.kind = 'payment';
+    row.payment_intent = pi || null;
     row.status = refundStatus(charge) || row.status;
     row.refunded_amount = charge?.amount_refunded || 0;
     row.tracked = tracked.has(row.product_id);
@@ -173,9 +178,9 @@ async function getTransactions(days, force) {
 
   // Subscription payments and invoiced charges (payment-mode Checkout invoices are skipped to avoid doubles).
   for (const inv of invoices) {
-    if (paymentCheckoutInvoices.has(inv.id)) continue;
+    if (inv.status !== 'paid' || paymentCheckoutInvoices.has(inv.id)) continue;
     if (!inv.amount_paid) continue; // trials, credits, amounts carried over: no money moved
-    const pi = idOf(inv.payments?.data?.find((p) => p.payment?.payment_intent)?.payment?.payment_intent ?? inv.payment_intent);
+    const pi = invoicePI(inv);
     const lines = inv.lines?.data || [];
     const paid = splitPaid(inv.amount_paid, lines.map((li) => li.amount));
     lines.forEach((li, i) => {
@@ -196,20 +201,60 @@ async function getTransactions(days, force) {
     });
   }
 
+  // Product/customer for a payment we have no row for: its invoice if we fetched it,
+  // otherwise the Checkout Session that created it.
+  const describePI = async (pi) => {
+    const inv = invoiceByPI.get(pi);
+    if (inv) {
+      return (inv.lines?.data || []).map((li) => ({
+        product_id: productOf(li),
+        product: names[productOf(li)] || li.description,
+        customer: inv.customer_email || inv.customer_name || '—',
+      }));
+    }
+    const found = await stripe('/v1/checkout/sessions', { payment_intent: pi, 'expand[]': ['data.line_items'] })
+      .then((res) => res.data[0]).catch(() => null);
+    return (found?.line_items?.data || []).map((li) => ({
+      product_id: productOf(li),
+      product: names[productOf(li)] || li.description,
+      customer: found.customer_details?.email || found.customer_details?.name || '—',
+    }));
+  };
+
+  // Payments not tied to a paid Checkout Session or invoice: direct API payments
+  // (counted like any payment) and failed/canceled attempts (listed, not counted).
+  for (const p of intents) {
+    if (rowsByPI.has(p.id) || p.status === 'requires_capture') continue;
+    const ok = p.status === 'succeeded';
+    if (!ok && !p.last_payment_error && p.status !== 'canceled') continue; // abandoned before any attempt
+    const originals = await describePI(p.id);
+    const first = originals[0] || {};
+    const row = {
+      id: p.id,
+      created: p.created,
+      product_id: first.product_id,
+      product: [...new Set(originals.map((o) => o.product))].join(', ') || p.description || 'Payment',
+      quantity: null,
+      amount: p.amount_received || p.amount,
+      currency: p.currency,
+      customer: first.customer || p.receipt_email || '—',
+      status: ok ? 'paid' : p.status === 'canceled' ? 'canceled' : 'failed',
+      source: invoiceByPI.has(p.id) ? 'Subscription' : 'Payment',
+      url: dashLink('payments', p.id),
+    };
+    if (ok) {
+      addPayment(p.id, row);
+    } else {
+      rows.push({ ...row, kind: 'failed', refunded_amount: 0, payment_intent: p.id, tracked: originals.some((o) => tracked.has(o.product_id)) });
+    }
+  }
+
   // Refunds as their own (negative) rows. If the original payment is older than the
   // date range, look up its Checkout Session so the refund still shows a product.
   for (const r of refunds) {
     const pi = idOf(r.payment_intent);
     let originals = (pi && rowsByPI.get(pi)) || [];
-    if (!originals.length && pi) {
-      const found = await stripe('/v1/checkout/sessions', { payment_intent: pi, 'expand[]': ['data.line_items'] })
-        .then((res) => res.data[0]).catch(() => null);
-      originals = (found?.line_items?.data || []).map((li) => ({
-        product_id: productOf(li),
-        product: names[productOf(li)] || li.description,
-        customer: found.customer_details?.email || found.customer_details?.name || '—',
-      }));
-    }
+    if (!originals.length && pi) originals = await describePI(pi);
     const first = originals[0] || {};
     rows.push({
       id: r.id,
@@ -235,7 +280,7 @@ async function getTransactions(days, force) {
     days,
     mode: isTestKey() ? 'test' : 'live',
     fetched_at: Date.now(),
-    truncated: [sessions, invoices, charges, refunds].some((list) => list.length >= MAX_PAGES * 100),
+    truncated: [sessions, invoices, charges, refunds, intents].some((list) => list.length >= MAX_PAGES * 100),
   };
   cache = { key, at: Date.now(), data };
   return data;
@@ -374,7 +419,8 @@ const server = http.createServer(async (req, res) => {
       return send(res, 500, { error: 'STRIPE_SECRET_KEY is not set. Copy .env.example to .env and add your key.' });
     }
     if (url.pathname === '/api/transactions' && req.method === 'GET') {
-      const days = Math.min(Math.max(Number(url.searchParams.get('days')) || 30, 1), 365);
+      const raw = url.searchParams.get('days');
+      const days = raw === 'all' ? 0 : Math.min(Math.max(Number(raw) || 30, 1), 365);
       return send(res, 200, await getTransactions(days, url.searchParams.has('refresh')));
     }
     if (url.pathname === '/api/catalog' && req.method === 'GET') {
