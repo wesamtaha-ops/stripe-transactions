@@ -47,8 +47,15 @@ function loadUsers() {
     const name = process.env[`DASHBOARD_USER${sfx}`];
     const pass = process.env[`DASHBOARD_PASSWORD${sfx}`];
     if (!name || !pass) continue;
-    const m = (process.env[`DASHBOARD_SCOPE${sfx}`] || '').match(/^\s*(only|hide)\s*:\s*(.+?)\s*$/i);
-    users.push({ name, pass, scope: m ? { mode: m[1].toLowerCase(), prefix: m[2].toLowerCase(), label: m[2] } : null });
+    // Hosting panels often keep surrounding quotes as part of the value; drop them.
+    const raw = (process.env[`DASHBOARD_SCOPE${sfx}`] || '').trim().replace(/^(['"])(.*)\1$/, '$2').trim();
+    const m = raw.match(/^(only|hide)\s*:\s*(.+)$/i);
+    if (raw && !m) {
+      // Fail closed: a typo here must never show a restricted user everything.
+      console.error(`DASHBOARD_SCOPE${sfx} is set but not understood: expected "only:<name>" or "hide:<name>".`);
+      process.exit(1);
+    }
+    users.push({ name, pass, scope: m ? { mode: m[1].toLowerCase(), prefix: m[2].trim().toLowerCase(), label: m[2].trim() } : null });
   }
   return users;
 }
@@ -498,5 +505,8 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, HOST, () => {
   console.log(`Dashboard running at http://localhost:${PORT}`);
+  for (const u of USERS) {
+    console.log(`  user "${u.name}": ${u.scope ? `${u.scope.mode === 'only' ? 'only' : 'everything except'} products starting with "${u.scope.label}"` : 'all products'}`);
+  }
   if (!STRIPE_KEY) console.warn('Warning: STRIPE_SECRET_KEY is not set (see .env.example).');
 });
