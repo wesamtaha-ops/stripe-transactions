@@ -1,4 +1,4 @@
-// Stripe product transactions dashboard — zero-dependency Node server.
+// Stripe transactions dashboard — zero-dependency Node server.
 // Keeps the Stripe key server-side and exposes a tiny JSON API to the dashboard page.
 
 const http = require('node:http');
@@ -91,86 +91,151 @@ const dashLink = (kind, id) => `https://dashboard.stripe.com/${isTestKey() ? 'te
 
 // ---------- transactions ----------
 
+const idOf = (v) => (typeof v === 'string' ? v : v?.id);
+
+// Spread what an invoice actually collected across its lines in proportion to their
+// list amounts, so discounts, taxes and carried-over balances are reflected. Integer
+// cents; the last line absorbs rounding so the parts add up exactly.
+function splitPaid(paid, lineAmounts) {
+  const total = lineAmounts.reduce((n, a) => n + a, 0);
+  if (!lineAmounts.length) return [];
+  if (!total) return lineAmounts.map((_, i) => (i === 0 ? paid : 0));
+  const parts = lineAmounts.map((a) => Math.round((a / total) * paid));
+  parts[parts.length - 1] += paid - parts.reduce((n, a) => n + a, 0);
+  return parts;
+}
+
+function refundStatus(charge) {
+  if (!charge || !charge.amount_refunded) return null;
+  return charge.refunded ? 'refunded' : 'partially refunded';
+}
+
 async function getTransactions(days, force) {
   const productIds = readProducts();
   const key = `${days}|${productIds.join(',')}`;
   if (!force && cache.data && cache.key === key && Date.now() - cache.at < CACHE_MS) return cache.data;
 
-  const wanted = new Set(productIds);
+  const tracked = new Set(productIds);
   const since = Math.floor(Date.now() / 1000) - days * 86400;
 
-  const [sessions, invoices, products] = await Promise.all([
+  const [sessions, invoices, charges, refunds, products] = await Promise.all([
     listAll('/v1/checkout/sessions', {
       status: 'complete',
       'created[gte]': since,
       'expand[]': ['data.line_items'],
     }),
-    listAll('/v1/invoices', { status: 'paid', 'created[gte]': since }),
-    productIds.length
-      ? stripe('/v1/products', { 'ids[]': productIds, limit: 100 }).then((r) => r.data)
-      : [],
+    listAll('/v1/invoices', { status: 'paid', 'created[gte]': since, 'expand[]': ['data.payments'] }),
+    listAll('/v1/charges', { 'created[gte]': since }),
+    listAll('/v1/refunds', { 'created[gte]': since }),
+    listAll('/v1/products', {}),
   ]);
 
+  // Products created inline at checkout (e.g. "Balance Top-Up") aren't in the catalog,
+  // so fall back to the line item description for their name.
   const names = Object.fromEntries(products.map((p) => [p.id, p.name]));
+  const chargeByPI = new Map(charges.map((c) => [idOf(c.payment_intent), c]));
   const rows = [];
+  const rowsByPI = new Map(); // payment_intent -> payment rows, used to label refunds
   const paymentCheckoutInvoices = new Set();
 
-  // One-time payments made through Checkout / Payment Links.
+  const addPayment = (pi, row) => {
+    const charge = pi && chargeByPI.get(pi);
+    row.kind = 'payment';
+    row.status = refundStatus(charge) || row.status;
+    row.refunded_amount = charge?.amount_refunded || 0;
+    row.tracked = tracked.has(row.product_id);
+    rows.push(row);
+    if (pi) rowsByPI.set(pi, [...(rowsByPI.get(pi) || []), row]);
+  };
+
+  // One-time payments made through Checkout / Payment Links (including top-ups).
   for (const s of sessions) {
     if (s.mode !== 'payment') continue; // subscriptions are counted via their invoices
-    if (s.invoice) paymentCheckoutInvoices.add(typeof s.invoice === 'string' ? s.invoice : s.invoice.id);
+    if (s.invoice) paymentCheckoutInvoices.add(idOf(s.invoice));
+    const pi = idOf(s.payment_intent);
     for (const li of s.line_items?.data || []) {
       const pid = productOf(li);
-      if (!wanted.has(pid)) continue;
-      rows.push({
+      addPayment(pi, {
         id: `${s.id}:${li.id}`,
         created: s.created,
         product_id: pid,
-        product: names[pid] || li.description || pid,
+        product: names[pid] || li.description || pid || 'Payment',
         quantity: li.quantity,
         amount: li.amount_total,
         currency: li.currency || s.currency,
         customer: s.customer_details?.email || s.customer_details?.name || '—',
         status: s.payment_status,
-        source: 'Checkout',
-        url: s.payment_intent
-          ? dashLink('payments', typeof s.payment_intent === 'string' ? s.payment_intent : s.payment_intent.id)
-          : dashLink('checkout/sessions', s.id),
+        source: s.payment_link ? 'Payment Link' : 'Checkout',
+        url: pi ? dashLink('payments', pi) : dashLink('checkout/sessions', s.id),
       });
     }
   }
 
-  // Subscription payments and invoiced charges (including Checkout-created invoices
-  // for subscription sessions; payment-mode sessions with invoices are skipped to avoid doubles).
+  // Subscription payments and invoiced charges (payment-mode Checkout invoices are skipped to avoid doubles).
   for (const inv of invoices) {
     if (paymentCheckoutInvoices.has(inv.id)) continue;
-    for (const li of inv.lines?.data || []) {
+    if (!inv.amount_paid) continue; // trials, credits, amounts carried over: no money moved
+    const pi = idOf(inv.payments?.data?.find((p) => p.payment?.payment_intent)?.payment?.payment_intent ?? inv.payment_intent);
+    const lines = inv.lines?.data || [];
+    const paid = splitPaid(inv.amount_paid, lines.map((li) => li.amount));
+    lines.forEach((li, i) => {
       const pid = productOf(li);
-      if (!wanted.has(pid)) continue;
-      rows.push({
+      addPayment(pi, {
         id: `${inv.id}:${li.id}`,
         created: inv.status_transitions?.paid_at || inv.created,
         product_id: pid,
-        product: names[pid] || li.description || pid,
+        product: names[pid] || li.description || pid || 'Invoice',
         quantity: li.quantity,
-        amount: li.amount,
+        amount: paid[i],
         currency: li.currency || inv.currency,
         customer: inv.customer_email || inv.customer_name || '—',
         status: 'paid',
         source: inv.subscription || inv.parent?.subscription_details ? 'Subscription' : 'Invoice',
         url: dashLink('invoices', inv.id),
       });
+    });
+  }
+
+  // Refunds as their own (negative) rows. If the original payment is older than the
+  // date range, look up its Checkout Session so the refund still shows a product.
+  for (const r of refunds) {
+    const pi = idOf(r.payment_intent);
+    let originals = (pi && rowsByPI.get(pi)) || [];
+    if (!originals.length && pi) {
+      const found = await stripe('/v1/checkout/sessions', { payment_intent: pi, 'expand[]': ['data.line_items'] })
+        .then((res) => res.data[0]).catch(() => null);
+      originals = (found?.line_items?.data || []).map((li) => ({
+        product_id: productOf(li),
+        product: names[productOf(li)] || li.description,
+        customer: found.customer_details?.email || found.customer_details?.name || '—',
+      }));
     }
+    const first = originals[0] || {};
+    rows.push({
+      id: r.id,
+      kind: 'refund',
+      created: r.created,
+      product_id: first.product_id,
+      product: [...new Set(originals.map((o) => o.product))].join(', ') || 'Refund',
+      quantity: null,
+      amount: -r.amount,
+      currency: r.currency,
+      customer: first.customer || '—',
+      status: r.status === 'succeeded' ? 'refund' : `refund ${r.status}`,
+      source: 'Refund',
+      tracked: originals.some((o) => tracked.has(o.product_id)),
+      url: pi ? dashLink('payments', pi) : dashLink('refunds', r.id),
+    });
   }
 
   rows.sort((a, b) => b.created - a.created);
   const data = {
     rows,
-    products: productIds.map((id) => ({ id, name: names[id] || id })),
+    tracked: productIds.map((id) => ({ id, name: names[id] || id })),
     days,
     mode: isTestKey() ? 'test' : 'live',
     fetched_at: Date.now(),
-    truncated: sessions.length >= MAX_PAGES * 100 || invoices.length >= MAX_PAGES * 100,
+    truncated: [sessions, invoices, charges, refunds].some((list) => list.length >= MAX_PAGES * 100),
   };
   cache = { key, at: Date.now(), data };
   return data;

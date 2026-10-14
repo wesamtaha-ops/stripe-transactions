@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Product Transactions</title>
+<title>Stripe Transactions</title>
 <style>
   :root {
     --bg: #f6f7f9; --surface: #fff; --text: #1a1f36; --muted: #697386; --border: #e3e8ee;
@@ -33,7 +33,7 @@
   .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
   .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
   .kpi .label { color: var(--muted); font-size: 12px; }
-  .kpi .value { font-size: 22px; font-weight: 650; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .kpi .value { font-size: 22px; font-weight: 650; margin-top: 4px; font-variant-numeric: tabular-nums; white-space: pre-line; }
   .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
   .table-scroll { overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; }
@@ -46,7 +46,10 @@
   .c-qty-inline { display: none; color: var(--muted); font-weight: 400; }
   @media (max-width: 640px) { .c-qty-inline { display: inline; } }
   .tag { font-size: 12px; padding: 1px 8px; border-radius: 6px; background: var(--bg); border: 1px solid var(--border); }
-  .status-paid { color: var(--ok); } .status-unpaid { color: var(--warn); }
+  .status-paid { color: var(--ok); } .status-unpaid, .status-partially-refunded { color: var(--warn); }
+  .status-refunded, .status-refund { color: var(--err); }
+  td.neg { color: var(--err); }
+  .refund-note { display: block; color: var(--err); font-size: 12px; font-weight: 400; }
   .empty, .error { padding: 32px; text-align: center; color: var(--muted); }
   .error { color: var(--err); }
   .meta { color: var(--muted); font-size: 12px; margin-top: 10px; }
@@ -63,16 +66,17 @@
     .wrap { padding: 16px 16px 40px; }
     header { flex-direction: column; align-items: stretch; }
     h1 { font-size: 18px; }
-    .controls { display: grid; grid-template-columns: 1fr 1fr; }
+    .controls { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .controls > * { width: 100%; min-width: 0; }
     .controls input[type=search] { grid-column: 1 / -1; order: -1; }
     #days, .logout { grid-column: 1 / -1; }
     select, input[type=search], button { padding: 10px 12px; font-size: 16px; } /* 16px stops iOS zoom */
     .chips { flex-wrap: nowrap; overflow-x: auto; margin: 0 -16px 16px; padding: 0 16px; scrollbar-width: none; }
     .chip { white-space: nowrap; padding: 7px 14px; }
-    .kpis { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .kpis { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
     .kpi { padding: 12px; }
-    .kpi .value { font-size: 18px; overflow-wrap: anywhere; }
-    .kpi:first-child { grid-column: 1 / -1; }
+    .kpi .value { font-size: 17px; }
+    .kpi:first-child, .kpi:last-child { grid-column: 1 / -1; }
 
     /* table -> stacked cards */
     .card { background: none; border: 0; }
@@ -104,7 +108,7 @@
 <body>
 <div class="wrap">
   <header>
-    <h1>Product Transactions <span id="mode" class="badge" hidden></span></h1>
+    <h1>Transactions <span id="mode" class="badge" hidden></span></h1>
     <div class="controls">
       <select id="days" aria-label="Date range">
         <option value="1">Last 24 hours</option>
@@ -112,6 +116,15 @@
         <option value="30" selected>Last 30 days</option>
         <option value="90">Last 90 days</option>
         <option value="365">Last 12 months</option>
+      </select>
+      <select id="view" aria-label="Which products">
+        <option value="all">All products</option>
+        <option value="tracked">Tracked products</option>
+      </select>
+      <select id="kind" aria-label="Transaction type">
+        <option value="all">All types</option>
+        <option value="payment">Payments</option>
+        <option value="refund">Refunds</option>
       </select>
       <input id="q" type="search" placeholder="Search customer…" aria-label="Search customer">
       <button id="refresh">Refresh</button>
@@ -143,7 +156,17 @@
 <script>
 const $ = (id) => document.getElementById(id);
 let data = null;
-let active = new Set();          // product ids currently shown (empty = all tracked)
+let active = new Set();          // product names picked in the chips (empty = all)
+
+// Remember the viewer's view/type choices between visits.
+const store = {
+  get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
+  set: (k, v) => { try { localStorage.setItem(k, v); } catch {} },
+};
+for (const id of ['view', 'kind']) {
+  const saved = store.get(id);
+  if (saved && [...$(id).options].some((o) => o.value === saved)) $(id).value = saved;
+}
 let timer;
 
 const fmtMoney = (cents, cur) => new Intl.NumberFormat(undefined, { style: 'currency', currency: cur.toUpperCase() }).format(cents / 100);
@@ -158,7 +181,7 @@ async function load(refresh = false) {
     const body = await res.json();
     if (!res.ok) throw new Error(body.error);
     data = body;
-    active = new Set([...active].filter((id) => data.products.some((p) => p.id === id)));
+    active = new Set([...active].filter((name) => data.rows.some((r) => r.product === name)));
     render();
   } catch (e) {
     $('rows').innerHTML = ''; $('kpis').innerHTML = ''; $('chips').innerHTML = '';
@@ -170,20 +193,26 @@ function render() {
   const mode = $('mode');
   mode.hidden = false; mode.className = `badge ${data.mode}`; mode.textContent = data.mode === 'test' ? 'Test mode' : 'Live';
 
-  $('chips').innerHTML = data.products.map((p) =>
-    `<span class="chip ${active.has(p.id) ? 'on' : ''}" data-id="${esc(p.id)}" title="${esc(p.id)}">${esc(p.name)}</span>`).join('');
+  // Rows for the chosen view and type; the product chips are built from these.
+  const view = $('view').value, kind = $('kind').value;
+  const inView = data.rows.filter((r) => (view === 'all' || r.tracked) && (kind === 'all' || r.kind === kind));
+  const productNames = [...new Set(inView.map((r) => r.product))].sort((a, b) => a.localeCompare(b));
+  $('chips').innerHTML = productNames.map((n) =>
+    `<span class="chip ${active.has(n) ? 'on' : ''}" data-name="${esc(n)}">${esc(n)}</span>`).join('');
 
   const q = $('q').value.trim().toLowerCase();
-  const rows = data.rows.filter((r) => (!active.size || active.has(r.product_id)) && (!q || r.customer.toLowerCase().includes(q)));
+  const rows = inView.filter((r) => (!active.size || active.has(r.product)) && (!q || r.customer.toLowerCase().includes(q)));
 
-  // KPIs: totals per currency so mixed-currency accounts stay correct.
-  const totals = {};
-  for (const r of rows) totals[r.currency] = (totals[r.currency] || 0) + r.amount;
-  const revenue = Object.entries(totals).map(([c, v]) => fmtMoney(v, c)).join(' · ') || '—';
-  const customers = new Set(rows.map((r) => r.customer).filter((c) => c !== '—')).size;
-  const units = rows.reduce((n, r) => n + (r.quantity || 0), 0);
+  // KPIs, per currency so mixed-currency accounts stay correct.
+  const sum = (list) => {
+    const t = {};
+    for (const r of list) t[r.currency] = (t[r.currency] || 0) + r.amount;
+    return Object.entries(t).map(([c, v]) => fmtMoney(v, c)).join('\n') || '—';
+  };
+  const payments = rows.filter((r) => r.kind === 'payment');
+  const refunds = rows.filter((r) => r.kind === 'refund');
   $('kpis').innerHTML = [
-    ['Revenue', revenue], ['Transactions', rows.length], ['Units sold', units], ['Customers', customers],
+    ['Net revenue', sum(rows)], ['Gross sales', sum(payments)], ['Refunds', refunds.length ? sum(refunds) : '—'], ['Payments', payments.length],
   ].map(([l, v]) => `<div class="kpi"><div class="label">${l}</div><div class="value">${esc(v)}</div></div>`).join('');
 
   $('rows').innerHTML = rows.map((r) => `<tr>
@@ -191,28 +220,30 @@ function render() {
       <td class="c-product">${esc(r.product)}${r.quantity > 1 ? ` <span class="c-qty-inline">×${r.quantity}</span>` : ''}</td>
       <td class="c-customer">${esc(r.customer)}</td>
       <td class="num c-qty">${r.quantity ?? ''}</td>
-      <td class="num c-amount">${fmtMoney(r.amount, r.currency)}</td>
+      <td class="num c-amount${r.amount < 0 ? ' neg' : ''}">${fmtMoney(r.amount, r.currency)}${r.refunded_amount && r.status !== 'refunded'
+        ? `<span class="refund-note">−${fmtMoney(r.refunded_amount, r.currency)} refunded</span>` : ''}</td>
       <td class="c-type"><span class="tag">${esc(r.source)}</span></td>
-      <td class="c-status status-${esc(r.status)}">${esc(r.status)}</td>
+      <td class="c-status status-${esc(r.status.replace(/ /g, '-'))}">${esc(r.status)}</td>
       <td class="c-link"><a href="${esc(r.url)}" target="_blank" rel="noopener">View ↗</a></td>
     </tr>`).join('');
 
   $('state').hidden = rows.length > 0;
   $('state').className = 'empty';
-  $('state').textContent = !data.products.length
-    ? 'No products selected yet — click “Choose products” to pick which ones to track.'
-    : 'No transactions for the selected products in this period.';
+  $('state').textContent = view === 'tracked' && !data.tracked.length
+    ? 'No tracked products yet — click “Choose products” to pick which ones to track.'
+    : 'No transactions match these filters in this period.';
 
   $('meta').textContent = `Updated ${new Date(data.fetched_at).toLocaleTimeString()} · auto-refreshes every minute` +
     (data.truncated ? ' · Showing the most recent 1,000 records per source; narrow the date range for complete totals.' : '');
 }
 
 $('chips').addEventListener('click', (e) => {
-  const id = e.target.dataset?.id; if (!id) return;
-  active.has(id) ? active.delete(id) : active.add(id);
+  const name = e.target.dataset?.name; if (name === undefined) return;
+  active.has(name) ? active.delete(name) : active.add(name);
   render();
 });
 $('days').addEventListener('change', () => load());
+for (const id of ['view', 'kind']) $(id).addEventListener('change', () => { store.set(id, $(id).value); active.clear(); data && render(); });
 $('refresh').addEventListener('click', () => load(true));
 $('q').addEventListener('input', () => data && render());
 
