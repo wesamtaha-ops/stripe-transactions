@@ -8,12 +8,29 @@ No dependencies — just Node 18+.
 
 1. Create a **restricted key** in Stripe: Dashboard → Developers → API keys → *Create restricted key*.
    Give it **Read** access to: Checkout Sessions, Invoices, Products, Charges, Refunds,
-   Payment Intents (everything else: None).
+   Payment Intents, Balance Transactions, Customers, Payouts, Balance (everything else: None).
 2. `cp .env.example .env`, paste the key into `STRIPE_SECRET_KEY`, and set `DASHBOARD_USER` /
    `DASHBOARD_PASSWORD` — the browser will ask for these when you open the dashboard.
 3. `npm start`, then open http://localhost:4242
 4. Optional: click **Choose products** and tick the products for the "Tracked products" view
    (saved to `products.json`).
+
+## Earnings, fees and payment details
+
+- The top cards and the **Earnings report** show amounts in your payout currency after Stripe's
+  fees (processing, currency conversion, VAT) and refunds, with a per-product breakdown and what's
+  still pending. **Download CSV** exports every transaction in the current view with those figures.
+- Click any transaction to open its details: activity timeline, checkout/invoice summary, payment
+  breakdown (conversion rate, itemised fees, net, funds-available date), refunds, payment method,
+  risk level and customer. Users only see details for payments within their scope.
+
+## Payouts
+
+**Payouts to your bank** shows what Stripe has already sent to your bank (with the payments in each
+payout), the next payout date and estimated amount (funds available now plus funds that become
+available before then), and the following cycle. Each transaction is tagged *Paid out <date>* or
+*Next payout <date>*, and the CSV includes the payout columns. Users with a scope see their share of
+each payout: only the payments they can see, without account-level fees.
 
 ## What counts as a transaction
 

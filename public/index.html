@@ -185,17 +185,154 @@
   .dlg-body code { color: var(--muted); font-size: 11.5px; margin-left: auto; }
   .dlg-foot { padding: 14px 20px; display: flex; gap: 10px; justify-content: flex-end; }
 
+  .kpi.fees .kpi-ico { background: var(--warn-soft); color: var(--warn); }
+  .kpis.home { grid-template-columns: 1.5fr 1.1fr 1fr 1fr; }
+  .kpi.feesbig { background: var(--surface); border: 1px solid var(--border); }
+  .kpi.feesbig .kpi-ico { background: var(--warn-soft); color: var(--warn); }
+  .kpi .alltime { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 12.5px; color: var(--text-2); display: flex; justify-content: space-between; gap: 8px; }
+  .kpi .alltime b { font-variant-numeric: tabular-nums; color: var(--text); }
+  .kpi.hero .alltime { border-top-color: rgba(255, 255, 255, .25); color: rgba(255, 255, 255, .85); }
+  .kpi.hero .alltime b { color: #fff; }
+  .approx { opacity: .7; font-weight: 600; margin-right: 2px; }
+  .fx-note { color: var(--muted); font-size: 12px; margin: -4px 0 14px; display: flex; align-items: flex-start; gap: 6px; }
+  .fx-note svg { margin-top: 1px; }
+  tbody tr.txn[data-pi] { cursor: pointer; }
+  .net-line { display: block; color: var(--muted); font-size: 11.5px; font-weight: 500; }
+
+  /* ----- payouts ----- */
+  .payouts-panel { padding: 16px 18px 6px; margin-bottom: 14px; }
+  .po-cards { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 12px; margin: 14px 0; }
+  .po-card { border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; background: var(--surface); }
+  .po-card.next { border-color: var(--accent); background: linear-gradient(180deg, var(--accent-soft), var(--surface) 70%); }
+  .po-card .l { color: var(--text-2); font-size: 12.5px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+  .po-card .date { font-size: 13px; color: var(--text-2); margin-top: 2px; }
+  .po-card .date b { color: var(--text); }
+  .po-card .v { font-size: 24px; font-weight: 700; letter-spacing: -.02em; margin: 6px 0 4px; font-variant-numeric: tabular-nums; }
+  .po-card .s { color: var(--muted); font-size: 12.5px; line-height: 1.6; }
+  .po-card .s b { color: var(--text-2); font-weight: 600; }
+  .po-bar { display: flex; height: 6px; border-radius: 99px; overflow: hidden; background: var(--neutral-soft); margin: 8px 0 6px; gap: 2px; }
+  .po-bar i { display: block; height: 100%; }
+  .po-table { margin: 0 -18px; }
+  .po-table th, .po-table td { padding: 10px 18px; }
+  .po-row { cursor: pointer; }
+  .po-row:hover { background: var(--surface-2); }
+  .po-row td:first-child::before { content: "›"; display: inline-block; width: 14px; color: var(--muted); transition: transform .15s; }
+  .po-row.expanded td:first-child::before { transform: rotate(90deg); }
+  .po-items td { background: var(--surface-2); padding: 0 18px 10px 50px !important; }
+  .po-items .it { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px dashed var(--border); font-size: 13px; color: var(--text-2); }
+  .po-items .it:last-child { border-bottom: 0; }
+  .bank { display: inline-flex; align-items: center; gap: 6px; color: var(--text-2); font-size: 13px; }
+  .po-pill { font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 99px; text-transform: capitalize; }
+  .po-pill.paid { background: var(--ok-soft); color: var(--ok); }
+  .po-pill.in_transit, .po-pill.pending { background: var(--accent-soft); color: var(--accent-ink); }
+  .po-pill.failed, .po-pill.canceled { background: var(--err-soft); color: var(--err); }
+  .po-tag { display: block; font-size: 11px; color: var(--muted); font-weight: 500; }
+  .po-tag.paid { color: var(--ok); }
+
+  /* ----- report ----- */
+  .report-panel { padding: 16px 18px 6px; margin-bottom: 14px; }
+  .report-sum { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin: 14px 0 12px; }
+  .report-sum > div { background: var(--surface); padding: 12px 14px; }
+  .report-sum .l { color: var(--muted); font-size: 12px; }
+  .report-sum .v { font-weight: 700; font-size: 17px; font-variant-numeric: tabular-nums; margin-top: 2px; }
+  .report-sum .v.neg { color: var(--refund); }
+  .report-sum .v.net { color: var(--ok); }
+  .report-note { color: var(--muted); font-size: 12.5px; margin: 0 0 10px; display: flex; gap: 6px; align-items: flex-start; }
+  .report-note svg { margin-top: 2px; }
+  .report-note b { color: var(--text-2); font-weight: 600; }
+  .report-table { margin: 0 -18px; }
+  .report-table th, .report-table td { padding: 10px 18px; }
+  .report-table tfoot td { font-weight: 700; background: var(--surface-2); border-bottom: 0; }
+  .btn-ghost { height: 34px; padding: 0 12px; display: inline-flex; align-items: center; gap: 7px; border-radius: 9px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-weight: 600; cursor: pointer; }
+  .btn-ghost:hover { border-color: var(--border-strong); }
+
+  /* ----- payment detail drawer ----- */
+  dialog.drawer { margin: 0 0 0 auto; height: 100vh; max-height: 100vh; width: min(1040px, 100vw); max-width: 100vw; border-radius: 18px 0 0 18px; border-right: 0; display: none; flex-direction: column; }
+  dialog.drawer[open] { display: flex; animation: slidein .22s ease-out; }
+  @keyframes slidein { from { transform: translateX(40px); opacity: 0; } }
+  .dw-top { display: flex; align-items: center; gap: 10px; padding: 14px 22px; border-bottom: 1px solid var(--border); }
+  .dw-top .crumb { color: var(--accent-ink); font-weight: 600; font-size: 13px; }
+  .dw-body { overflow: auto; padding: 22px 26px 40px; flex: 1; }
+  .dw-hero { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; align-items: flex-start; margin-bottom: 24px; }
+  .dw-amount { font-size: 30px; font-weight: 700; letter-spacing: -.02em; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .dw-amount .cur { color: var(--muted); font-weight: 600; font-size: 24px; }
+  .dw-sub { color: var(--text-2); margin-top: 4px; }
+  .dw-sub a { font-weight: 600; }
+  .dw-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .dw-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 36px; }
+  .dw-sec { margin-bottom: 30px; }
+  .dw-sec h3 { font-size: 17px; margin: 0 0 12px; letter-spacing: -.01em; }
+  .dw-sec .hint { color: var(--muted); margin: -6px 0 12px; font-size: 13px; }
+  .tl { list-style: none; margin: 0; padding: 0; }
+  .tl li { position: relative; display: flex; justify-content: space-between; gap: 12px; padding: 0 0 18px 26px; }
+  .tl li::before { content: ""; position: absolute; left: 5px; top: 18px; bottom: -2px; width: 1.5px; background: var(--border); }
+  .tl li:last-child::before { display: none; }
+  .tl .dot { position: absolute; left: 0; top: 4px; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--border-strong); background: var(--surface); }
+  .tl .dot.good { border-color: var(--ok); background: var(--ok); box-shadow: 0 0 0 3px var(--ok-soft); }
+  .tl .dot.bad { border-color: var(--err); background: var(--err); box-shadow: 0 0 0 3px var(--err-soft); }
+  .tl .dot.future { border-style: dashed; }
+  .tl .t { font-weight: 600; }
+  .tl .d { color: var(--muted); font-size: 12.5px; text-transform: capitalize; }
+  .tl time { color: var(--text-2); font-size: 13px; white-space: nowrap; text-decoration: underline dotted var(--border-strong); text-underline-offset: 3px; }
+  .kv { display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 8px 16px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .kv:first-of-type { border-top: 1px solid var(--border); }
+  .kv .k { font-weight: 600; }
+  .kv .v { color: var(--text-2); overflow-wrap: anywhere; }
+  .items { width: 100%; border-collapse: collapse; margin-top: 4px; }
+  .items th { text-align: left; font-size: 12px; color: var(--text-2); font-weight: 500; text-transform: none; letter-spacing: 0; background: none; padding: 10px 4px; border-bottom: 1px solid var(--border); }
+  .items td { padding: 12px 4px; white-space: normal; }
+  .items .r { text-align: right; font-variant-numeric: tabular-nums; }
+  .items tfoot td { border-bottom: 0; padding: 6px 4px; }
+  .items tfoot tr.total td { font-weight: 700; border-top: 1px solid var(--border); padding-top: 12px; }
+  .items .period { display: block; color: var(--muted); font-size: 12px; }
+  .bd { border-top: 1px solid var(--border); }
+  .bd-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 13px 4px; border-bottom: 1px solid var(--border); }
+  .bd-row .k { font-weight: 600; }
+  .bd-row .k small { color: var(--muted); font-weight: 400; margin-left: 6px; font-size: 12px; }
+  .bd-row .v { font-variant-numeric: tabular-nums; font-weight: 600; text-align: right; }
+  .bd-row .v .from { color: var(--muted); font-weight: 500; margin-right: 6px; }
+  .bd-row.total { font-size: 15.5px; }
+  .bd-row.total .v { font-weight: 700; }
+  .bd-row.good .v { color: var(--ok); } .bd-row.bad .v { color: var(--refund); }
+  details.fees > summary { list-style: none; cursor: pointer; }
+  details.fees > summary::-webkit-details-marker { display: none; }
+  details.fees > summary .k::before { content: "›"; display: inline-block; margin-right: 8px; transition: transform .15s; color: var(--muted); }
+  details.fees[open] > summary .k::before { transform: rotate(90deg); }
+  .fee-row { display: flex; justify-content: space-between; padding: 8px 4px 8px 24px; color: var(--text-2); font-size: 13px; border-bottom: 1px dashed var(--border); font-variant-numeric: tabular-nums; }
+  .callout { display: flex; gap: 10px; padding: 10px 12px; border-radius: 10px; font-size: 13px; margin-top: 12px; background: var(--neutral-soft); color: var(--text-2); }
+  .callout.bad { background: var(--err-soft); color: var(--err); }
+  .callout svg { margin-top: 2px; }
+  .side h4 { font-size: 16px; margin: 0 0 14px; display: flex; align-items: center; gap: 8px; }
+  .side .f { margin-bottom: 16px; }
+  .side .f .k { font-weight: 600; margin-bottom: 3px; }
+  .side .f .v { color: var(--text-2); overflow-wrap: anywhere; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .side .block { padding-bottom: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+  .copy { border: 0; background: none; color: var(--muted); cursor: pointer; padding: 2px; border-radius: 5px; display: inline-grid; }
+  .copy:hover { color: var(--accent-ink); background: var(--accent-soft); }
+  .copy svg { width: 14px; height: 14px; }
+  .tag-soft { font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 6px; background: var(--neutral-soft); color: var(--text-2); }
+  .risk { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 6px; text-transform: capitalize; }
+  .risk.normal { background: var(--ok-soft); color: var(--ok); } .risk.elevated { background: var(--warn-soft); color: var(--warn); } .risk.highest { background: var(--err-soft); color: var(--err); }
+  .brand-badge { font-size: 10.5px; font-weight: 800; letter-spacing: .03em; padding: 2px 6px; border-radius: 5px; background: var(--text); color: var(--surface); text-transform: uppercase; }
+  .pm-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; }
+  .pm-grid .kv { grid-template-columns: 120px minmax(0, 1fr); }
+  .dw-loading { display: grid; gap: 14px; }
+
   /* ----- tablet ----- */
   @media (max-width: 960px) {
     .kpis { grid-template-columns: 1fr 1fr; }
+    .dw-grid { grid-template-columns: 1fr; gap: 8px; }
+    .report-sum { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .po-cards { grid-template-columns: 1fr 1fr; }
+    .po-card.next { grid-column: 1 / -1; }
   }
 
   /* ----- phones ----- */
   @media (max-width: 640px) {
     .appbar-in { padding: 10px 16px; gap: 8px; }
     .brand { white-space: nowrap; font-size: 14px; gap: 8px; }
-    .updated, .icon-btn .lbl, .who .name { display: none; }
-    .who .scope { display: none; }
+    .updated, .icon-btn .lbl, .who { display: none !important; }
     .wrap { padding: 18px 16px 40px; }
     h1 { font-size: 21px; }
     .page-head .btn-primary { width: 100%; justify-content: center; }
@@ -213,17 +350,20 @@
     .kpi .value .more { font-size: 13px; }
     .kpi.hero { grid-column: 1 / -1; }
     .kpi.hero .value { font-size: 26px; }
-    .kpi.count { grid-column: 1 / -1; }
+    .kpi.fees { grid-column: 1 / -1; }
+    .kpis.home { grid-template-columns: 1fr 1fr; }
+    .kpi.feesbig { grid-column: 1 / -1; }
     .chart { height: 170px; }
 
     /* table -> stacked cards */
     .table-panel { background: none; border: 0; box-shadow: none; }
     .table-head { padding: 0 2px 10px; border: 0; }
-    thead { display: none; }
-    table, tbody, tr, td { display: block; width: 100%; }
+    .table-panel thead, .report-table thead { display: none; }
+    .table-panel table, .table-panel tbody, .table-panel tr, .table-panel td,
+    .report-table table, .report-table tbody, .report-table tfoot { display: block; width: 100%; }
     tr.group td { background: none; border: 0; padding: 14px 2px 6px; }
     tbody tr.txn { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; margin-bottom: 8px; box-shadow: var(--shadow); }
-    td { padding: 0; border: 0; white-space: normal; }
+    .table-panel td { padding: 0; border: 0; white-space: normal; }
     td.c-product { grid-area: 1 / 1; }
     td.c-amount { grid-area: 1 / 2; text-align: right; }
     td.c-customer { grid-area: 2 / 1; font-size: 13px; overflow-wrap: anywhere; padding-left: 40px; }
@@ -236,6 +376,35 @@
     .state { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; }
     .dlg-body code { display: none; }
     .dlg-foot > * { flex: 1; justify-content: center; }
+    dialog.drawer { width: 100vw; border-radius: 0; border: 0; }
+    .dw-top { padding: 10px 12px; gap: 8px; }
+    .dw-top .crumb { display: none; }
+    .dw-actions { flex-wrap: nowrap; }
+    .dw-actions .btn-ghost { padding: 0 10px; font-size: 13px; white-space: nowrap; }
+    .items th, .items td { font-size: 13px; }
+    .dw-body { padding: 18px 16px 40px; }
+    .dw-amount { font-size: 26px; }
+    .kv, .pm-grid .kv { grid-template-columns: 110px minmax(0, 1fr); }
+    .pm-grid { grid-template-columns: 1fr; }
+    .report-table { margin: 0; }
+    .report-table thead { display: none; }
+    .report-table tr { display: grid !important; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 10px 2px; border-bottom: 1px solid var(--border); background: none !important; box-shadow: none !important; border-radius: 0 !important; margin: 0 !important; border-left: 0 !important; border-right: 0 !important; border-top: 0 !important; }
+    .report-table td { padding: 0 !important; border: 0 !important; font-size: 13px; white-space: normal; }
+    .report-table td.rp-name { font-weight: 600; font-size: 14px; }
+    .report-table td.rp-net { text-align: right; font-weight: 700; }
+    .report-table td.rp-meta { grid-column: 1 / -1; color: var(--muted); }
+    .report-table td.rp-col { display: none !important; }
+    .report-panel { padding: 14px 14px 4px; }
+    .payouts-panel { padding: 14px 14px 4px; }
+    .po-cards { grid-template-columns: 1fr; }
+    .po-table { margin: 0; }
+    .po-table thead { display: none; }
+    .po-table table, .po-table tbody { display: block; }
+    .po-table tr.po-row { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 10px 2px; border-bottom: 1px solid var(--border); }
+    .po-table tr.po-row td { padding: 0; border: 0; white-space: normal; font-size: 13px; }
+    .po-table td.pc-hide { display: none; }
+    .po-table tr.po-items { display: block; }
+    .po-table tr.po-items td { display: block; padding: 6px 4px 10px 16px !important; }
   }
   .time-inline { display: none; color: var(--muted); }
 </style>
@@ -295,6 +464,11 @@
       </select>
       <svg class="i chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
     </label>
+    <label class="field" title="Currency used for totals, the chart and the report">
+      <svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15 9.5c-.5-1-1.6-1.5-3-1.5-1.7 0-3 .9-3 2s1.3 1.7 3 2 3 .9 3 2-1.3 2-3 2c-1.4 0-2.5-.5-3-1.5M12 6v2M12 16v2"/></svg>
+      <select id="cur" aria-label="Show amounts in"></select>
+      <svg class="i chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+    </label>
     <div class="seg" id="kind" role="group" aria-label="Transaction type">
       <button data-v="all" aria-pressed="true">All</button>
       <button data-v="payment" aria-pressed="false">Payments</button>
@@ -309,7 +483,24 @@
 
   <div id="chips" class="chips"></div>
 
-  <section id="kpis" class="kpis" aria-label="Totals"></section>
+  <section id="kpis" class="kpis home" aria-label="Totals"></section>
+  <p id="fxNote" class="fx-note" hidden></p>
+
+  <section class="panel payouts-panel" aria-labelledby="payouts-title">
+    <div class="panel-head">
+      <div>
+        <div class="panel-title" id="payouts-title">Payouts to your bank</div>
+        <div class="sub" id="poSub" style="font-size:12.5px"></div>
+      </div>
+    </div>
+    <div id="poCards" class="po-cards"></div>
+    <div class="table-scroll po-table">
+      <table>
+        <thead><tr><th>Arrived</th><th>Status</th><th class="num">Payments</th><th class="num">Gross</th><th class="num">Fees</th><th class="num">Refunds</th><th class="num">Paid out</th></tr></thead>
+        <tbody id="poRows"></tbody>
+      </table>
+    </div>
+  </section>
 
   <section class="panel chart-panel" aria-labelledby="chart-title">
     <div class="panel-head">
@@ -320,6 +511,27 @@
       </div>
     </div>
     <div id="chart" class="chart"></div>
+  </section>
+
+  <section class="panel report-panel" aria-labelledby="report-title">
+    <div class="panel-head">
+      <div>
+        <div class="panel-title" id="report-title">Earnings report</div>
+        <div class="sub" id="reportSub" style="font-size:12.5px"></div>
+      </div>
+      <button id="csv" class="btn-ghost" title="Download every transaction in this view as a spreadsheet">
+        <svg class="i" viewBox="0 0 24 24"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>Download CSV
+      </button>
+    </div>
+    <div id="reportSum" class="report-sum"></div>
+    <p id="reportNote" class="report-note"></p>
+    <div class="table-scroll report-table">
+      <table>
+        <thead><tr><th>Product</th><th class="num">Payments</th><th class="num">Gross</th><th class="num">Stripe fees</th><th class="num">Refunds</th><th class="num">You receive</th></tr></thead>
+        <tbody id="reportRows"></tbody>
+        <tfoot id="reportFoot"></tfoot>
+      </table>
+    </div>
   </section>
 
   <section class="panel table-panel">
@@ -333,6 +545,16 @@
     <div id="state" class="state"></div>
   </section>
 </main>
+
+<dialog id="detail" class="drawer" aria-label="Payment details">
+  <div class="dw-top">
+    <button id="dwClose" class="icon-btn" aria-label="Close"><svg class="i" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    <span class="crumb">Transactions</span>
+    <span class="spacer"></span>
+    <div id="dwActions" class="dw-actions"></div>
+  </div>
+  <div id="dwBody" class="dw-body"></div>
+</dialog>
 
 <dialog id="dlg">
   <div class="dlg-head">
@@ -353,6 +575,12 @@ let data = null;
 let active = new Set();   // product names picked in the chips (empty = all)
 let kind = 'all';
 let chartCur = null;      // currency shown in the chart
+let shown = [];           // rows currently listed (used by the CSV export)
+let allTime = null;       // all-time rows for the "All time" totals
+let payouts = null;       // from /api/payouts
+const openPayouts = new Set();
+const DISPLAY_CURS = ['aed', 'usd', 'eur', 'gbp', 'sek', 'sar', 'qar', 'egp', 'inr', 'cad', 'aud', 'chf', 'try'];
+let displayCur = null;    // chosen in "Show in"; defaults to the payout currency
 
 const store = {
   get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
@@ -361,11 +589,15 @@ const store = {
 {
   const v = store.get('view');
   if (v && [...$('view').options].some((o) => o.value === v)) $('view').value = v;
+  displayCur = store.get('cur');
   const k = store.get('kind');
   if (k && document.querySelector(`#kind [data-v="${k}"]`)) kind = k;
 }
 
 const fmtMoney = (cents, cur) => new Intl.NumberFormat(undefined, { style: 'currency', currency: cur.toUpperCase() }).format(cents / 100);
+const fmtDate = (s) => new Date(s * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+const fmtDateTime = (s) => new Date(s * 1000).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+const fmtShort = (s) => new Date(s * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 const fmtTime = (s) => new Date(s * 1000).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const initials = (name) => name.split(/[\s-]+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '•';
@@ -386,6 +618,12 @@ const ICON = {
   wallet: '<svg class="i" viewBox="0 0 24 24"><path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3"/><path d="M21 9h-6a3 3 0 0 0 0 6h6Z"/></svg>',
   up: '<svg class="i" viewBox="0 0 24 24"><path d="m3 17 6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg>',
   users: '<svg class="i" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+  fee: '<svg class="i" viewBox="0 0 24 24"><path d="M19 5 5 19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>',
+  clock: '<svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  check: '<svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg>',
+  copy: '<svg class="i" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>',
+  info: '<svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>',
+  receipt: '<svg class="i" viewBox="0 0 24 24"><path d="M5 21V3l2 1.5L9 3l2 1.5L13 3l2 1.5L17 3l2 1.5V21l-2-1.5-2 1.5-2-1.5-2 1.5-2-1.5L7 21Z"/><path d="M9 9h6M9 13h6"/></svg>',
   empty: '<svg class="i" viewBox="0 0 24 24"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.7 4H7.3a2 2 0 0 0-1.8 1.1Z"/></svg>',
 };
 
@@ -408,6 +646,10 @@ async function load(refresh = false) {
     const body = await res.json();
     if (!res.ok) throw new Error(body.error);
     data = body;
+    setupCurrency();
+    fetch(`/api/payouts${refresh ? '?refresh=1' : ''}`).then((r) => r.ok ? r.json() : null).then((b) => { payouts = b; renderPayouts(); }).catch(() => {});
+    if ($('days').value === 'all') allTime = data.rows;
+    else fetch('/api/transactions?days=all').then((r) => r.ok ? r.json() : null).then((b) => { if (b) { allTime = b.rows; render(); } }).catch(() => {});
     active = new Set([...active].filter((name) => data.rows.some((r) => r.product === name)));
     render();
   } catch (e) {
@@ -448,8 +690,11 @@ function render() {
   const rows = inView.filter((r) => (!active.size || active.has(r.product)) &&
     (!q || r.customer.toLowerCase().includes(q) || r.product.toLowerCase().includes(q)));
 
+  shown = rows;
   renderKpis(rows);
   renderChart(rows);
+  renderReport(rows);
+  renderPayouts();
   renderTable(rows);
 }
 
@@ -465,39 +710,211 @@ function curOrder() {
   for (const r of data.rows) if (r.kind !== 'failed') n[r.currency] = (n[r.currency] || 0) + 1;
   return Object.keys(n).sort((a, b) => n[b] - n[a]);
 }
-function moneyBlock(list) {
-  const t = sumByCur(list);
-  if (!t.length) return '—';
-  const [first, ...rest] = t.map(([c, v]) => fmtMoney(v, c));
-  return esc(first) + rest.map((m) => `<span class="more">${esc(m)}</span>`).join('');
+
+// ----- display currency -----
+const payoutCur = () => data?.rates?.base || 'aed';
+const rateFor = (cur) => cur === payoutCur() ? 1 : data?.rates?.rates?.[cur] ?? null;
+// Payout-currency cents -> display-currency cents.
+const conv = (cents) => Math.round(cents * (rateFor(displayCur) ?? 1));
+const converted = () => displayCur !== payoutCur();
+const money = (cents) => (converted() ? '<span class="approx">≈</span>' : '') + esc(fmtMoney(conv(cents), displayCur));
+const moneyText = (cents) => (converted() ? '≈ ' : '') + fmtMoney(conv(cents), displayCur);
+
+function setupCurrency() {
+  const base = payoutCur();
+  const seen = curOrder();
+  const options = [...new Set([base, ...seen, ...DISPLAY_CURS])].filter((c) => rateFor(c) != null);
+  if (!displayCur || !options.includes(displayCur)) displayCur = base;
+  $('cur').innerHTML = options.map((c) => `<option value="${c}">${c.toUpperCase()}${c === base ? ' · payout' : ''}</option>`).join('');
+  $('cur').value = displayCur;
+}
+
+// Sums over rows that settled (have payout-currency figures).
+function totals(list) {
+  const t = { gross: 0, fees: 0, refunds: 0, net: 0, payments: 0, refundCount: 0, pending: 0 };
+  const now = Date.now() / 1000;
+  for (const r of list) {
+    if (r.kind === 'failed' || r.net == null || r.settle_currency !== payoutCur()) continue;
+    if (r.kind === 'payment') { t.gross += r.settle_gross; t.fees += r.fee; t.payments++; }
+    else { t.refunds += -r.net; t.refundCount++; }
+    t.net += r.net;
+    if (r.available_on > now) t.pending += r.net;
+  }
+  return t;
 }
 
 function renderKpis(rows) {
-  // Failed/canceled payments are listed but never counted as money.
-  const payments = rows.filter((r) => r.kind === 'payment');
-  const refunds = rows.filter((r) => r.kind === 'refund');
-  const failed = rows.filter((r) => r.kind === 'failed');
-  const customers = new Set(payments.map((r) => r.customer).filter((c) => c !== '—')).size;
+  const t = totals(rows);
+  const all = allTime ? totals(scopeLikeView(allTime)) : null;
   const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+  const period = $('days').selectedOptions[0].textContent;
+  const allLine = (v) => all && $('days').value !== 'all' ? `<div class="alltime"><span>All time</span><b>${v}</b></div>` : '';
+  const feePct = t.gross ? (t.fees / t.gross * 100).toFixed(1) : null;
   const cards = [
-    ['hero', ICON.wallet, 'Net revenue', moneyBlock([...payments, ...refunds]), 'After refunds'],
-    ['gross', ICON.up, 'Gross sales', moneyBlock(payments), plural(payments.length, 'payment')],
-    ['refunds', ICON.refund, 'Refunds', refunds.length ? moneyBlock(refunds) : '—', plural(refunds.length, 'refund')],
-    ['count', ICON.users, 'Customers', String(customers), failed.length ? `${failed.length} failed or canceled` : 'No failed payments'],
+    ['hero', ICON.wallet, 'Your money', money(t.net),
+      `${period} · after Stripe fees and refunds${t.pending ? ` · ${moneyText(t.pending)} still pending` : ''}`, allLine(all && money(all.net))],
+    ['feesbig', ICON.fee, 'Stripe fees', money(t.fees),
+      `${period}${feePct ? ` · ${feePct}% of sales` : ''} · processing, conversion and VAT`, allLine(all && money(all.fees))],
+    ['gross', ICON.up, 'Gross sales', money(t.gross), plural(t.payments, 'payment'), ''],
+    ['refunds', ICON.refund, 'Refunds', t.refunds ? '−' + money(t.refunds) : '—', plural(t.refundCount, 'refund'), ''],
   ];
-  $('kpis').innerHTML = cards.map(([cls, ico, label, value, foot]) =>
-    `<div class="kpi ${cls}"><div class="kpi-head"><span class="kpi-ico">${ico}</span>${label}</div><div class="value">${value}</div><div class="foot">${esc(foot)}</div></div>`).join('');
+  $('kpis').innerHTML = cards.map(([cls, ico, label, value, foot, extra]) =>
+    `<div class="kpi ${cls}"><div class="kpi-head"><span class="kpi-ico">${ico}</span>${label}</div><div class="value">${value}</div><div class="foot">${esc(foot)}</div>${extra}</div>`).join('');
+
+  const r = data.rates;
+  $('fxNote').hidden = !converted();
+  if (converted()) {
+    $('fxNote').innerHTML = `${ICON.info}<span>Stripe pays you in ${payoutCur().toUpperCase()}. Amounts marked ≈ are converted at 1 ${payoutCur().toUpperCase()} = ${rateFor(displayCur).toFixed(4)} ${displayCur.toUpperCase()}` +
+      (r.source === 'stripe' ? ' (rate Stripe used on your payments)' : ` (${esc(r.source)}${r.updated ? `, ${esc(fmtDate(r.updated))}` : ''})`) + '.</span>';
+  }
+}
+
+// All-time rows filtered the same way as the current view (product view, type, chips, search).
+function scopeLikeView(list) {
+  const view = $('view').value, q = $('q').value.trim().toLowerCase();
+  return list.filter((r) => (view === 'all' || r.tracked) && (kind === 'all' || r.kind === kind) &&
+    (!active.size || active.has(r.product)) && (!q || r.customer.toLowerCase().includes(q) || r.product.toLowerCase().includes(q)));
+}
+
+// Per-product earnings in the payout currency, plus what's still on its way.
+function renderReport(rows) {
+  const t = totals(rows);
+  const customers = new Set(rows.filter((r) => r.kind === 'payment').map((r) => r.customer).filter((c) => c !== '—')).size;
+  const has = t.payments || t.refundCount;
+  $('reportSub').textContent = has
+    ? `Amounts in ${displayCur.toUpperCase()}${converted() ? ` (converted from ${payoutCur().toUpperCase()}, the currency Stripe pays out)` : ', the currency Stripe pays out to you'} · ${customers} customer${customers === 1 ? '' : 's'}`
+    : 'No settled payments in this view';
+  if (!has) { $('reportSum').innerHTML = ''; $('reportRows').innerHTML = ''; $('reportFoot').innerHTML = ''; $('reportNote').innerHTML = ''; return; }
+  $('reportSum').innerHTML = [
+    ['Gross sales', money(t.gross), ''], ['Stripe fees', '−' + money(t.fees), 'neg'],
+    ['Refunds', t.refunds ? '−' + money(t.refunds) : money(0), t.refunds ? 'neg' : ''], ['Your money', money(t.net), 'net'],
+  ].map(([l, v, c]) => `<div><div class="l">${l}</div><div class="v ${c}">${v}</div></div>`).join('');
+
+  const now = Date.now() / 1000;
+  const pending = rows.filter((r) => r.net != null && r.available_on > now && r.kind !== 'failed');
+  const nextDate = pending.length ? Math.min(...pending.map((r) => r.available_on)) : null;
+  $('reportNote').innerHTML = t.pending
+    ? `${ICON.clock}<span><b>${money(t.pending)}</b> is still on its way from Stripe · next funds available <b>${esc(fmtDate(nextDate))}</b></span>`
+    : `${ICON.check}<span>All funds in this view are available in your Stripe balance.</span>`;
+
+  const by = new Map();
+  for (const r of rows) {
+    if (r.kind === 'failed' || r.net == null || r.settle_currency !== payoutCur()) continue;
+    const g = by.get(r.product) || { name: r.product, count: 0, gross: 0, fees: 0, refunds: 0, net: 0 };
+    if (r.kind === 'payment') { g.count++; g.gross += r.settle_gross; g.fees += r.fee; } else g.refunds += -r.net;
+    g.net += r.net;
+    by.set(r.product, g);
+  }
+  const groups = [...by.values()].sort((a, b) => b.net - a.net);
+  const mobile = matchMedia('(max-width: 640px)').matches;
+  $('reportRows').innerHTML = groups.map((g) => `<tr>
+      <td class="rp-name"><div class="prod"><span class="avatar" style="width:26px;height:26px;font-size:11px">${esc(initials(g.name))}</span>${esc(g.name)}</div></td>
+      <td class="num rp-col">${g.count}</td>
+      <td class="num rp-col">${money(g.gross)}</td>
+      <td class="num rp-col">−${money(g.fees)}</td>
+      <td class="num rp-col">${g.refunds ? `<span style="color:var(--refund)">−${money(g.refunds)}</span>` : '—'}</td>
+      <td class="num rp-net"><b>${money(g.net)}</b></td>
+      <td class="rp-meta" style="${mobile ? '' : 'display:none'}">${g.count} payment${g.count === 1 ? '' : 's'} · ${money(g.gross)} gross · −${money(g.fees)} fees${g.refunds ? ` · −${money(g.refunds)} refunds` : ''}</td>
+    </tr>`).join('');
+  $('reportFoot').innerHTML = groups.length > 1 ? `<tr>
+      <td class="rp-name">Total</td><td class="num rp-col">${t.payments}</td><td class="num rp-col">${money(t.gross)}</td>
+      <td class="num rp-col">−${money(t.fees)}</td><td class="num rp-col">${t.refunds ? `−${money(t.refunds)}` : '—'}</td><td class="num rp-net">${money(t.net)}</td>
+    </tr>` : '';
+}
+
+// Payouts: what already reached the bank, and what's coming in the next cycle.
+function renderPayouts() {
+  if (!payouts || !data) { $('poCards').innerHTML = '<span class="skel" style="width:60%;height:60px"></span>'; return; }
+  const p = payouts;
+  const pc = p.currency;
+  // Payout amounts are in the payout currency; show them in the chosen currency like the rest.
+  const pm = (cents) => pc === payoutCur() ? money(cents) : esc(fmtMoney(cents, pc));
+  const bank = p.bank ? `${esc(p.bank.name)} •••• ${esc(p.bank.last4)}` : 'your bank';
+  const daysUntil = (t) => Math.max(0, Math.ceil((t * 1000 - Date.now()) / 864e5));
+  $('poSub').textContent = `${p.schedule.text}${p.schedule.delay_days ? ` · payments become available ${p.schedule.delay_days} days after they're made` : ''}` +
+    (p.scoped ? ' · showing your share (payments you can see)' : '');
+
+  const paidList = p.payouts.filter((x) => x.status === 'paid');
+  const last = paidList[0];
+  const n = p.next;
+  const total = n ? n.available_now + n.becoming_available : 0;
+  const cards = [];
+  if (n) {
+    const a = total ? (n.available_now / total) * 100 : 0;
+    cards.push(`<div class="po-card next">
+      <div class="l">${ICON.clock}Next payout</div>
+      <div class="date"><b>${esc(new Date(n.date * 1000).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }))}</b> · in ${daysUntil(n.date)} day${daysUntil(n.date) === 1 ? '' : 's'} · to ${bank}</div>
+      <div class="v">${pm(n.amount)}</div>
+      ${total ? `<div class="po-bar"><i style="width:${a}%;background:var(--ok)"></i><i style="width:${100 - a}%;background:var(--accent)"></i></div>` : ''}
+      <div class="s"><b>${pm(n.available_now)}</b> already available · <b>${pm(n.becoming_available)}</b> becoming available before then · ${n.count} transaction${n.count === 1 ? '' : 's'} · estimate</div>
+    </div>`);
+  } else {
+    cards.push(`<div class="po-card next"><div class="l">${ICON.clock}Next payout</div><div class="v">—</div><div class="s">${esc(p.schedule.text)}</div></div>`);
+  }
+  cards.push(`<div class="po-card">
+      <div class="l">${ICON.check}Paid to your bank</div>
+      <div class="v">${pm(p.paid_out)}</div>
+      <div class="s">${paidList.length} payout${paidList.length === 1 ? '' : 's'}${last ? ` · last on <b>${esc(fmtDate(last.arrival_date))}</b> (${pm(last.amount)})` : ''}${p.in_transit ? ` · <b>${pm(p.in_transit)}</b> on the way` : ''}</div>
+    </div>`);
+  cards.push(p.after && p.after.amount
+    ? `<div class="po-card"><div class="l">${ICON.clock}Following payout</div><div class="date"><b>${esc(fmtDate(p.after.date))}</b></div><div class="v">${pm(p.after.amount)}</div><div class="s">Funds that become available after the next payout</div></div>`
+    : p.balance
+      ? `<div class="po-card"><div class="l">${ICON.wallet}Stripe balance now</div><div class="v">${pm(p.balance.available + p.balance.pending)}</div><div class="s"><b>${pm(p.balance.available)}</b> available · <b>${pm(p.balance.pending)}</b> pending</div></div>`
+      : `<div class="po-card"><div class="l">${ICON.info}How payouts work</div><div class="s" style="margin-top:6px">Stripe holds each payment for ${p.schedule.delay_days || 'a few'} days, then sends everything available to ${bank} ${p.schedule.text.toLowerCase().replace('monthly on', 'on')}.</div></div>`);
+  $('poCards').innerHTML = cards.join('');
+
+  $('poRows').innerHTML = p.payouts.length ? p.payouts.map((x) => {
+    const open = openPayouts.has(x.id);
+    return `<tr class="po-row${open ? ' expanded' : ''}" data-po="${esc(x.id)}">
+      <td>${esc(fmtDate(x.arrival_date))}${x.bank ? `<span class="po-tag">${esc(x.bank.name)} •••• ${esc(x.bank.last4)}</span>` : ''}</td>
+      <td><span class="po-pill ${esc(x.status)}">${esc(x.status.replace('_', ' '))}</span></td>
+      <td class="num pc-hide">${x.payments}${x.refunds ? ` <span class="po-tag" style="display:inline">+${x.refunds} refund${x.refunds === 1 ? '' : 's'}</span>` : ''}</td>
+      <td class="num pc-hide">${pm(x.gross)}</td>
+      <td class="num pc-hide">−${pm(x.fees)}</td>
+      <td class="num pc-hide">${x.refunded ? `−${pm(x.refunded)}` : '—'}</td>
+      <td class="num"><b>${pm(x.amount)}</b>${x.other ? `<span class="po-tag">incl. ${pm(x.other)} account fees/other</span>` : ''}</td>
+    </tr>` + (open ? `<tr class="po-items"><td colspan="7">${x.items.map((it) => `<div class="it"><span>${esc(fmtDate(it.created))} · ${esc(it.product)}${it.kind === 'refund' ? ' (refund)' : ''}</span><b>${pm(it.net)}</b></div>`).join('') || '<div class="it">No transactions you can see</div>'}</td></tr>` : '');
+  }).join('') : `<tr><td colspan="7" class="state">No payouts yet</td></tr>`;
+}
+
+// Every column a bookkeeper would want, for the rows currently shown.
+function downloadCsv() {
+  const cols = [
+    ['Date', (r) => new Date(r.created * 1000).toISOString().slice(0, 10)],
+    ['Time', (r) => new Date(r.created * 1000).toTimeString().slice(0, 5)],
+    ['Type', (r) => r.kind], ['Status', (r) => r.status], ['Product', (r) => r.product], ['Customer', (r) => r.customer],
+    ['Source', (r) => r.source], ['Quantity', (r) => r.quantity ?? ''],
+    ['Amount', (r) => (r.amount / 100).toFixed(2)], ['Currency', (r) => r.currency.toUpperCase()],
+    ['Refunded', (r) => r.refunded_amount ? (r.refunded_amount / 100).toFixed(2) : ''],
+    ['Converted amount', (r) => r.settle_gross != null ? (r.settle_gross / 100).toFixed(2) : ''],
+    ['Stripe fees', (r) => r.fee != null ? (r.fee / 100).toFixed(2) : ''],
+    ['Net (you receive)', (r) => r.net != null ? (r.net / 100).toFixed(2) : ''],
+    ['Payout currency', (r) => (r.settle_currency || '').toUpperCase()],
+    ['Exchange rate', (r) => r.exchange_rate ?? ''],
+    ['Funds available on', (r) => r.available_on ? new Date(r.available_on * 1000).toISOString().slice(0, 10) : ''],
+    ['Funds status', (r) => r.funds_status || ''],
+    ['Payout', (r) => !r.payout ? '' : r.payout.status === 'upcoming' ? 'upcoming' : r.payout.status],
+    ['Payout date', (r) => r.payout?.date ? new Date(r.payout.date * 1000).toISOString().slice(0, 10) : ''],
+    ['Payment ID', (r) => r.payment_intent || r.id], ['Stripe link', (r) => r.url],
+  ];
+  const cell = (v) => { const t = String(v ?? ''); return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
+  const csv = [cols.map(([h]) => h).join(','), ...shown.map((r) => cols.map(([, f]) => cell(f(r))).join(','))].join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = `stripe-transactions-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
 // Payments up, refunds down, per day/week/month depending on how much time is shown.
 function renderChart(rows) {
-  const money = rows.filter((r) => r.kind !== 'failed');
-  const curs = curOrder().filter((c) => money.some((r) => r.currency === c));
-  if (!curs.includes(chartCur)) chartCur = curs[0] || null;
-  $('curTabs').innerHTML = curs.length > 1
-    ? curs.map((c) => `<button data-cur="${c}" aria-pressed="${c === chartCur}">${c.toUpperCase()}</button>`).join('') : '';
+  // Built from payout-currency figures so every sale lands on one scale, shown in the chosen currency.
+  const settled = rows.filter((r) => r.kind !== 'failed' && r.net != null && r.settle_currency === payoutCur());
+  chartCur = displayCur;
+  $('curTabs').innerHTML = `<span class="tag-soft">${displayCur.toUpperCase()}${converted() ? ' ≈' : ''}</span>`;
   const el = $('chart');
-  const list = money.filter((r) => r.currency === chartCur);
+  const list = settled;
+  const money = settled;
   if (!list.length) { el.innerHTML = '<div class="chart-empty">No revenue in this period</div>'; return; }
 
   const now = Date.now() / 1000;
@@ -523,7 +940,7 @@ function renderChart(rows) {
   for (const r of list) {
     const i = idx.get(floor(r.created).getTime());
     if (i === undefined) continue;
-    if (r.amount >= 0) buckets[i].pay += r.amount; else buckets[i].ref -= r.amount;
+    if (r.kind === 'payment') buckets[i].pay += conv(r.settle_gross); else buckets[i].ref += conv(-r.net);
   }
 
   const W = el.clientWidth || 800, H = el.clientHeight || 200;
@@ -587,13 +1004,20 @@ function renderTable(rows) {
       : `<span class="avatar">${esc(initials(r.product))}</span>`;
     const note = r.refunded_amount && r.status !== 'refunded'
       ? `<span class="refund-note">−${fmtMoney(r.refunded_amount, r.currency)} refunded</span>` : '';
-    html += `<tr class="txn${r.kind === 'failed' ? ' unpaid' : ''}">
+    const poWhen = r.payout && (r.payout.date ? fmtShort(r.payout.date) : null);
+    const poTag = !r.payout ? '' : r.kind === 'refund'
+      ? `<span class="po-tag">${poWhen ? `Deducted from ${r.payout.status === 'upcoming' ? 'next' : ''} payout ${esc(poWhen)}`.replace('  ', ' ') : 'Deducted from a later payout'}</span>`
+      : r.payout.status === 'upcoming'
+        ? `<span class="po-tag">${poWhen ? `Next payout ${esc(poWhen)}` : 'Later payout'}</span>`
+        : `<span class="po-tag paid">Paid out ${esc(poWhen)}</span>`;
+    const netLine = r.net != null && r.kind === 'payment' ? `<span class="net-line">You get ${esc(moneyText(r.net))}</span>${poTag}` : r.kind === 'refund' ? poTag : '';
+    html += `<tr class="txn${r.kind === 'failed' ? ' unpaid' : ''}"${r.payment_intent ? ` data-pi="${esc(r.payment_intent)}"` : ''}>
       <td class="c-product"><div class="prod">${avatar}<span>${esc(r.product)}${r.quantity > 1 ? ` <span class="qty">×${r.quantity}</span>` : ''}</span></div></td>
       <td class="c-customer cust">${esc(r.customer)}</td>
       <td class="c-meta src">${esc(r.source)}<span class="time-inline"> · ${fmtTime(r.created)}</span></td>
       <td class="c-time time">${fmtTime(r.created)}</td>
       <td class="c-status"><span class="pill ${esc(r.status.replace(/ /g, '-'))}">${esc(r.status)}</span></td>
-      <td class="num c-amount"><span class="amount${r.amount < 0 ? ' neg' : ''}">${fmtMoney(r.amount, r.currency)}</span>${note}</td>
+      <td class="num c-amount"><span class="amount${r.amount < 0 ? ' neg' : ''}">${fmtMoney(r.amount, r.currency)}</span>${note}${netLine}</td>
       <td class="c-link"><a class="open" href="${esc(r.url)}" target="_blank" rel="noopener" title="Open in Stripe" aria-label="Open in Stripe">${ICON.open}</a></td>
     </tr>`;
   }
@@ -607,6 +1031,151 @@ function renderTable(rows) {
 }
 
 // ---------- events ----------
+
+$('csv').addEventListener('click', downloadCsv);
+$('poRows').addEventListener('click', (e) => {
+  const tr = e.target.closest('tr.po-row'); if (!tr) return;
+  if (openPayouts.has(tr.dataset.po)) openPayouts.delete(tr.dataset.po); else openPayouts.add(tr.dataset.po);
+  renderPayouts();
+});
+$('rows').addEventListener('click', (e) => {
+  if (e.target.closest('a')) return; // the arrow still opens Stripe
+  const tr = e.target.closest('tr[data-pi]');
+  if (tr) openDetail(tr.dataset.pi);
+});
+
+// ----- payment detail -----
+const cap = (t) => t ? t.charAt(0).toUpperCase() + t.slice(1) : '';
+const flag = (cc) => cc && cc.length === 2 ? String.fromCodePoint(...[...cc.toUpperCase()].map((c) => 0x1f1a5 + c.charCodeAt(0))) : '';
+const regionName = (cc) => { try { return new Intl.DisplayNames(undefined, { type: 'region' }).of(cc); } catch { return cc; } };
+const copyBtn = (text) => `<button class="copy" data-copy="${esc(text)}" title="Copy" aria-label="Copy">${ICON.copy}</button>`;
+
+$('dwClose').addEventListener('click', () => $('detail').close());
+$('detail').addEventListener('close', () => { if (location.hash) history.replaceState(null, '', location.pathname + location.search); });
+$('detail').addEventListener('click', (e) => {
+  const c = e.target.closest('[data-copy]');
+  if (c) { navigator.clipboard?.writeText(c.dataset.copy); c.innerHTML = ICON.check; setTimeout(() => { c.innerHTML = ICON.copy; }, 1200); }
+  if (e.target === $('detail')) $('detail').close(); // click on the backdrop
+});
+
+async function openDetail(pi) {
+  if (!$('detail').open) $('detail').showModal();
+  history.replaceState(null, '', `#${pi}`);
+  $('dwActions').innerHTML = '';
+  $('dwBody').innerHTML = `<div class="dw-loading">${['30%', '55%', '90%', '80%', '70%', '85%'].map((w, i) => `<span class="skel" style="width:${w};height:${i ? 14 : 30}px"></span>`).join('')}</div>`;
+  try {
+    const res = await fetch(`/api/payments/${encodeURIComponent(pi)}`);
+    if (res.status === 401) return location.assign('/login');
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.error);
+    renderDetail(d);
+  } catch (e) {
+    $('dwBody').innerHTML = `<div class="state error">${esc(e.message)}</div>`;
+  }
+}
+
+function renderDetail(d) {
+  const b = d.breakdown;
+  const m = fmtMoney;
+  const statusCls = d.status.replace(/ /g, '-').replace('succeeded', 'paid');
+  $('dwActions').innerHTML =
+    (d.receipt_url ? `<a class="btn-ghost" href="${esc(d.receipt_url)}" target="_blank" rel="noopener">${ICON.receipt}Receipt</a>` : '') +
+    `<a class="btn-ghost" href="${esc(d.stripe_url)}" target="_blank" rel="noopener">Open in Stripe ${ICON.open}</a>`;
+
+  const hero = `<div class="dw-hero"><div>
+      <div class="dw-amount">${esc(m(d.amount, d.currency))}<span class="cur">${d.currency.toUpperCase()}</span><span class="pill ${esc(statusCls)}">${esc(d.status)}</span></div>
+      <div class="dw-sub">${d.customer.name || d.customer.email ? `Charged to <a href="${esc(d.links.customer || d.stripe_url)}" target="_blank" rel="noopener">${esc(d.customer.name || d.customer.email)}</a> · ` : ''}${esc(d.product || '')} · ${esc(d.source)}</div>
+    </div></div>`;
+
+  const timeline = `<section class="dw-sec"><h3>Recent activity</h3><ul class="tl">${d.events.map((e) => `<li>
+      <span class="dot ${e.tone}${e.future ? ' future' : ''}"></span>
+      <div><div class="t">${esc(e.label)}</div>${e.detail ? `<div class="d">${esc(e.detail)}</div>` : ''}</div>
+      <time>${esc(e.future ? fmtDate(e.at) : fmtDateTime(e.at))}</time></li>`).join('')}</ul></section>`;
+
+  const t = d.totals;
+  const tf = t ? [
+    t.discount ? ['Discount', `−${m(t.discount, t.currency)}`] : null,
+    t.tax ? ['Tax', m(t.tax, t.currency)] : null,
+    t.shipping ? ['Shipping', m(t.shipping, t.currency)] : null,
+    t.credit ? ['Paid from customer balance', `−${m(t.credit, t.currency)}`] : null,
+  ].filter(Boolean) : [];
+  const summary = `<section class="dw-sec"><h3>${d.ids.invoice ? 'Invoice summary' : 'Checkout summary'}</h3>
+    <div class="kv"><div class="k">Customer</div><div class="v">${[d.customer.email, d.customer.name, d.customer.country && `${flag(d.customer.country)} ${regionName(d.customer.country)}`].filter(Boolean).map(esc).join('<br>') || '—'}</div></div>
+    ${d.ids.invoice_number ? `<div class="kv"><div class="k">Invoice</div><div class="v"><a href="${esc(d.links.invoice)}" target="_blank" rel="noopener">${esc(d.ids.invoice_number)}</a>${d.links.hosted_invoice ? ` · <a href="${esc(d.links.hosted_invoice)}" target="_blank" rel="noopener">Customer view</a>` : ''}</div></div>` : ''}
+    <table class="items"><thead><tr><th>Items</th><th class="r">Qty</th><th class="r">Unit price</th><th class="r">Amount</th></tr></thead>
+      <tbody>${d.items.map((i) => `<tr><td>${esc(i.name)}${i.period ? `<span class="period">${esc(fmtDate(i.period.start))} – ${esc(fmtDate(i.period.end))}</span>` : ''}</td>
+        <td class="r">${i.quantity ?? ''}</td><td class="r">${i.unit_amount != null ? esc(m(i.unit_amount, i.currency)) : ''}</td><td class="r">${esc(m(i.amount, i.currency))}</td></tr>`).join('')}</tbody>
+      <tfoot>${tf.map(([k, v]) => `<tr><td colspan="3" class="r">${k}</td><td class="r">${esc(v)}</td></tr>`).join('')}
+        <tr class="total"><td colspan="3" class="r">Total${t?.paid != null && t.paid !== t.total ? ' charged' : ''}</td><td class="r">${esc(m(t?.paid ?? t?.total ?? d.amount, t?.currency || d.currency))}</td></tr></tfoot>
+    </table></section>`;
+
+  let breakdown = '';
+  if (b) {
+    const converted = b.currency !== b.settle_currency;
+    breakdown = `<section class="dw-sec"><h3>Payment breakdown</h3>
+      ${converted ? `<p class="hint">Charge was received in ${b.currency.toUpperCase()}, but the funds are paid out to you in ${b.settle_currency.toUpperCase()}.</p>` : ''}
+      <div class="bd">
+        <div class="bd-row"><div class="k">Payment amount${converted && b.exchange_rate ? `<small>1 ${b.currency.toUpperCase()} = ${b.exchange_rate} ${b.settle_currency.toUpperCase()}</small>` : ''}</div>
+          <div class="v">${converted ? `<span class="from">${esc(m(b.amount, b.currency))} →</span>` : ''}${esc(m(b.settle_amount, b.settle_currency))}</div></div>
+        <details class="fees"><summary class="bd-row"><div class="k">Stripe fees<small>${b.settle_amount ? ((b.fee / b.settle_amount) * 100).toFixed(2) + '% of this payment' : ''}</small></div><div class="v">−${esc(m(b.fee, b.settle_currency))}</div></summary>
+          ${b.fees.map((f) => `<div class="fee-row"><span>${esc(f.label)}</span><span>−${esc(m(f.amount, f.currency))}</span></div>`).join('')}
+        </details>
+        <div class="bd-row total"><div class="k">Net amount</div><div class="v">${esc(m(b.net, b.settle_currency))}${b.settle_currency === payoutCur() && converted() ? `<span class="net-line">≈ ${esc(fmtMoney(conv(b.net), displayCur))}</span>` : ''}</div></div>
+        ${b.refunded ? `<div class="bd-row bad"><div class="k">Refunded</div><div class="v">−${esc(m(b.refunded, b.settle_currency))}</div></div>
+          <div class="bd-row total ${b.net_after_refunds < 0 ? 'bad' : 'good'}"><div class="k">You keep</div><div class="v">${esc(m(b.net_after_refunds, b.settle_currency))}</div></div>` : ''}
+      </div>
+      ${b.refunded ? `<div class="callout bad">${ICON.info}<span>Stripe doesn't return its fees when you refund${converted ? ', and the exchange rate on the refund can differ' : ''}, so this payment ${b.net_after_refunds < 0 ? `cost you ${esc(m(-b.net_after_refunds, b.settle_currency))}` : `left you ${esc(m(b.net_after_refunds, b.settle_currency))}`}.</span></div>` : ''}
+      <div class="callout">${ICON.clock}<span>${b.funds_status === 'available' ? 'Funds became available' : 'Funds will be available'} in your Stripe balance on <b>${esc(fmtDate(b.available_on))}</b>.</span></div>
+    </section>`;
+  } else if (['failed', 'canceled'].includes(d.status)) {
+    breakdown = `<section class="dw-sec"><h3>Payment breakdown</h3><div class="callout">${ICON.info}<span>No money moved for this payment, so there are no fees.</span></div></section>`;
+  }
+
+  const refunds = d.refunds.length ? `<section class="dw-sec"><h3>Refunds</h3>${d.refunds.map((r) => `<div class="kv">
+      <div class="k">${esc(fmtDateTime(r.created))}</div>
+      <div class="v"><b style="color:var(--refund)">−${esc(m(r.amount, r.currency))}</b>${r.settle_amount != null && r.settle_currency !== r.currency ? ` (−${esc(m(r.settle_amount, r.settle_currency))})` : ''} · ${esc(cap(r.status))}${r.reason ? ` · ${esc(cap(r.reason))}` : ''}</div></div>`).join('')}</section>` : '';
+
+  const pm = d.method;
+  const checks = pm?.checks ? Object.entries(pm.checks).filter(([, v]) => v).map(([k, v]) => `${k.toUpperCase()} ${v.replace(/_/g, ' ')}`).join(' · ') : '';
+  const pmRows = pm ? [
+    ['Type', pm.type === 'card' ? `${cap(pm.funding || '')} card`.trim() : cap(pm.type?.replace(/_/g, ' '))],
+    ['Number', pm.last4 ? `•••• ${pm.last4}` : null], ['Brand', cap(pm.brand)], ['Expires', pm.exp],
+    ['Issuer', pm.country ? `${flag(pm.country)} ${regionName(pm.country)}` : null], ['Wallet', pm.wallet ? cap(pm.wallet.replace(/_/g, ' ')) : null],
+    ['3D Secure', pm.three_d_secure ? cap(pm.three_d_secure.replace(/_/g, ' ')) : null], ['Checks', checks || null],
+  ].filter(([, v]) => v) : [];
+  const method = pmRows.length ? `<section class="dw-sec"><h3>Payment method</h3><div class="pm-grid">${pmRows.map(([k, v]) => `<div class="kv"><div class="k">${k}</div><div class="v">${esc(v)}</div></div>`).join('')}</div></section>` : '';
+
+  const f = (k, v) => v ? `<div class="f"><div class="k">${k}</div><div class="v">${v}</div></div>` : '';
+  const side = `<aside class="side">
+    <div class="block"><h4>Details</h4>
+      ${f('Payment ID', `<span class="mono">${esc(d.id)}</span>${copyBtn(d.id)}`)}
+      ${f('Payment method', pm?.last4 ? `<span class="brand-badge">${esc(pm.brand || pm.type)}</span> •••• ${esc(pm.last4)}` : esc(cap(pm?.type || '')))}
+      ${f('Risk level', d.risk?.level ? `<span class="risk ${esc(d.risk.level)}">${esc(d.risk.level.replace(/_/g, ' '))}</span>${d.risk.score != null ? ` score ${d.risk.score}` : ''}` : '')}
+      ${f('Description', esc(d.description || '—'))}
+      ${f('Statement descriptor', esc(d.statement_descriptor || '—'))}
+      ${b ? f('Funds available', `${esc(fmtDate(b.available_on))} <span class="tag-soft">${esc(cap(b.funds_status))}</span>`) : ''}
+      ${(() => { const r = data?.rows.find((x) => x.payment_intent === d.id && x.payout); if (!r) return ''; return f('Payout', r.payout.status === 'upcoming'
+        ? (r.payout.date ? `In the next payout · ${esc(fmtDate(r.payout.date))}` : 'In a later payout')
+        : `Paid out ${esc(fmtDate(r.payout.date))} <span class="tag-soft">${esc(cap(r.payout.status.replace('_', ' ')))}</span>`); })()}
+      ${f('Last updated', esc(fmtDateTime(d.updated)))}
+    </div>
+    <div class="block"><h4>Customer ${d.customer.guest ? '<span class="tag-soft">Guest</span>' : ''}</h4>
+      ${f('ID', d.customer.id ? `<a class="mono" href="${esc(d.links.customer)}" target="_blank" rel="noopener">${esc(d.customer.id)}</a>` : '')}
+      ${f('Name', esc(d.customer.name || ''))}
+      ${f('Email', d.customer.email ? `${esc(d.customer.email)}${copyBtn(d.customer.email)}` : '')}
+      ${f('Phone', esc(d.customer.phone || ''))}
+      ${f('Country', d.customer.country ? `${flag(d.customer.country)} ${esc(regionName(d.customer.country))}` : '')}
+    </div>
+    <div class="block" style="border:0"><h4>References</h4>
+      ${f('Charge', d.ids.charge ? `<span class="mono">${esc(d.ids.charge)}</span>${copyBtn(d.ids.charge)}` : '')}
+      ${f('Checkout Session', d.ids.checkout_session ? `<span class="mono">${esc(d.ids.checkout_session.slice(0, 24))}…</span>${copyBtn(d.ids.checkout_session)}` : '')}
+      ${f('Invoice', d.ids.invoice ? `<span class="mono">${esc(d.ids.invoice)}</span>${copyBtn(d.ids.invoice)}` : '')}
+      ${f('Subscription', d.ids.subscription ? `<span class="mono">${esc(d.ids.subscription)}</span>${copyBtn(d.ids.subscription)}` : '')}
+    </div>
+  </aside>`;
+
+  $('dwBody').innerHTML = hero + `<div class="dw-grid"><div>${timeline}${summary}${breakdown}${refunds}${method}</div>${side}</div>`;
+}
 
 $('chips').addEventListener('click', (e) => {
   const chip = e.target.closest('.chip'); if (!chip) return;
@@ -623,6 +1192,7 @@ $('curTabs').addEventListener('click', (e) => {
   const b = e.target.closest('button'); if (!b) return;
   chartCur = b.dataset.cur; if (data) render();
 });
+$('cur').addEventListener('change', () => { displayCur = $('cur').value; store.set('cur', displayCur); if (data) render(); });
 $('view').addEventListener('change', () => { store.set('view', $('view').value); active.clear(); if (data) render(); });
 $('days').addEventListener('change', () => load());
 $('refresh').addEventListener('click', () => load(true));
@@ -666,6 +1236,7 @@ $('dlgsave').addEventListener('click', async () => {
 
 load();
 setInterval(() => load(), 60_000);
+if (/^#pi_[A-Za-z0-9]+$/.test(location.hash)) openDetail(location.hash.slice(1));
 </script>
 </body>
 </html>
