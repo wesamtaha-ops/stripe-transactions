@@ -447,11 +447,12 @@
     <label class="field">
       <svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
       <select id="days" aria-label="Date range">
-        <option value="1">Last 24 hours</option>
-        <option value="7">Last 7 days</option>
-        <option value="30" selected>Last 30 days</option>
-        <option value="90">Last 90 days</option>
-        <option value="365">Last 12 months</option>
+        <option value="today">Today</option>
+        <option value="week">This week</option>
+        <option value="month" selected>This month</option>
+        <option value="last_month">Last month</option>
+        <option value="year">This year</option>
+        <optgroup label="By month" id="months"></optgroup>
         <option value="all">All time</option>
       </select>
       <svg class="i chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
@@ -597,6 +598,31 @@ const store = {
 const fmtMoney = (cents, cur) => new Intl.NumberFormat(undefined, { style: 'currency', currency: cur.toUpperCase() }).format(cents / 100);
 const fmtDate = (s) => new Date(s * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 const fmtDateTime = (s) => new Date(s * 1000).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+// Calendar periods in the viewer's timezone, as unix seconds [from, to).
+function periodRange(v) {
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
+  const sec = (dt) => Math.floor(dt.getTime() / 1000);
+  if (v === 'today') return { from: sec(new Date(y, m, d)), to: sec(new Date(y, m, d + 1)) };
+  if (v === 'week') { const mon = d - ((now.getDay() + 6) % 7); return { from: sec(new Date(y, m, mon)), to: sec(new Date(y, m, mon + 7)) }; }
+  if (v === 'month') return { from: sec(new Date(y, m, 1)), to: sec(new Date(y, m + 1, 1)) };
+  if (v === 'last_month') return { from: sec(new Date(y, m - 1, 1)), to: sec(new Date(y, m, 1)) };
+  if (v === 'year') return { from: sec(new Date(y, 0, 1)), to: sec(new Date(y + 1, 0, 1)) };
+  const mm = /^m:(\d{4})-(\d{2})$/.exec(v);
+  if (mm) return { from: sec(new Date(+mm[1], +mm[2] - 1, 1)), to: sec(new Date(+mm[1], +mm[2], 1)) };
+  return {}; // all time
+}
+// "By month" lists the last 12 calendar months.
+(() => {
+  const now = new Date();
+  $('months').innerHTML = Array.from({ length: 12 }, (_, i) => {
+    const dt = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const v = `m:${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
+    return `<option value="${v}">${dt.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</option>`;
+  }).join('');
+  const saved = store.get('period');
+  if (saved && [...$('days').options].some((o) => o.value === saved)) $('days').value = saved;
+})();
 const fmtShort = (s) => new Date(s * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 const fmtTime = (s) => new Date(s * 1000).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -641,7 +667,9 @@ async function load(refresh = false) {
   if (!data) showSkeleton();
   $('refresh').classList.add('spin');
   try {
-    const res = await fetch(`/api/transactions?days=${$('days').value}${refresh ? '&refresh=1' : ''}`);
+    const r = periodRange($('days').value);
+    const qs = new URLSearchParams({ ...(r.from ? { from: r.from } : {}), ...(r.to ? { to: r.to } : {}), ...(refresh ? { refresh: 1 } : {}) });
+    const res = await fetch(`/api/transactions?${qs}`);
     if (res.status === 401) return location.assign('/login');
     const body = await res.json();
     if (!res.ok) throw new Error(body.error);
@@ -649,7 +677,7 @@ async function load(refresh = false) {
     setupCurrency();
     fetch(`/api/payouts${refresh ? '?refresh=1' : ''}`).then((r) => r.ok ? r.json() : null).then((b) => { payouts = b; renderPayouts(); }).catch(() => {});
     if ($('days').value === 'all') allTime = data.rows;
-    else fetch('/api/transactions?days=all').then((r) => r.ok ? r.json() : null).then((b) => { if (b) { allTime = b.rows; render(); } }).catch(() => {});
+    else fetch('/api/transactions').then((r) => r.ok ? r.json() : null).then((b) => { if (b) { allTime = b.rows; render(); } }).catch(() => {});
     active = new Set([...active].filter((name) => data.rows.some((r) => r.product === name)));
     render();
   } catch (e) {
@@ -918,24 +946,31 @@ function renderChart(rows) {
   if (!list.length) { el.innerHTML = '<div class="chart-empty">No revenue in this period</div>'; return; }
 
   const now = Date.now() / 1000;
-  const startSec = $('days').value === 'all' ? Math.min(...money.map((r) => r.created)) : now - Number($('days').value) * 86400;
-  const spanDays = (now - startSec) / 86400;
-  const unit = spanDays <= 45 ? 'day' : spanDays <= 120 ? 'week' : 'month';
+  const pr = periodRange($('days').value);
+  const startSec = pr.from || Math.min(...money.map((r) => r.created));
+  const endSec = Math.min(pr.to || now, now);
+  const spanDays = (endSec - startSec) / 86400;
+  const unit = spanDays <= 1.01 ? 'hour' : spanDays <= 45 ? 'day' : spanDays <= 120 ? 'week' : 'month';
   const floor = (sec) => {
-    const d = new Date(sec * 1000); d.setHours(0, 0, 0, 0);
+    const d = new Date(sec * 1000);
+    if (unit === 'hour') { d.setMinutes(0, 0, 0); return d; }
+    d.setHours(0, 0, 0, 0);
     if (unit === 'week') d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
     if (unit === 'month') d.setDate(1);
     return d;
   };
   const step = (d) => {
     const n = new Date(d);
-    if (unit === 'day') n.setDate(n.getDate() + 1);
+    if (unit === 'hour') n.setHours(n.getHours() + 1);
+    else if (unit === 'day') n.setDate(n.getDate() + 1);
     else if (unit === 'week') n.setDate(n.getDate() + 7);
     else n.setMonth(n.getMonth() + 1);
     return n;
   };
   const buckets = [];
-  for (let d = floor(startSec); d <= new Date(); d = step(d)) buckets.push({ t: d, pay: 0, ref: 0 });
+  // Whole period for past periods; up to now for the current one.
+  const last = new Date((pr.to && pr.to <= now ? pr.to - 1 : now) * 1000);
+  for (let d = floor(startSec); d <= last; d = step(d)) buckets.push({ t: d, pay: 0, ref: 0 });
   const idx = new Map(buckets.map((b, i) => [b.t.getTime(), i]));
   for (const r of list) {
     const i = idx.get(floor(r.created).getTime());
@@ -957,7 +992,8 @@ function renderChart(rows) {
   // Rounded at the data end, square at the baseline.
   const barUp = (x, v) => h(v) < 0.5 ? '' : `<path fill="var(--accent)" d="M${x},${zeroY}V${zeroY - h(v) + r4}q0,-${r4} ${r4},-${r4}h${barW - 2 * r4}q${r4},0 ${r4},${r4}V${zeroY}Z"/>`;
   const barDown = (x, v) => h(v) < 0.5 ? '' : `<path fill="var(--refund)" d="M${x},${zeroY}V${zeroY + h(v) - r4}q0,${r4} ${r4},${r4}h${barW - 2 * r4}q${r4},0 ${r4},-${r4}V${zeroY}Z"/>`;
-  const tick = (d) => d.toLocaleDateString(undefined, unit === 'month' ? { month: 'short', year: '2-digit' } : { month: 'short', day: 'numeric' });
+  const tick = (d) => unit === 'hour' ? d.toLocaleTimeString(undefined, { hour: 'numeric' })
+    : d.toLocaleDateString(undefined, unit === 'month' ? { month: 'short', year: '2-digit' } : { month: 'short', day: 'numeric' });
   const every = Math.ceil(buckets.length / Math.max(2, Math.floor(W / 80)));
 
   let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Payments and refunds per ${unit} in ${chartCur.toUpperCase()}">`;
@@ -973,7 +1009,8 @@ function renderChart(rows) {
   el.querySelectorAll('.hit').forEach((hit) => {
     hit.addEventListener('mouseenter', () => {
       const b = buckets[hit.dataset.i];
-      const label = unit === 'day' ? b.t.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
+      const label = unit === 'hour' ? `${b.t.toLocaleTimeString(undefined, { hour: 'numeric' })} – ${step(b.t).toLocaleTimeString(undefined, { hour: 'numeric' })}`
+        : unit === 'day' ? b.t.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
         : unit === 'week' ? `Week of ${b.t.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
         : b.t.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
       tip.innerHTML = `<b>${esc(label)}</b><div><span>Payments</span><span>${fmtMoney(b.pay, chartCur)}</span></div>` +
@@ -1111,12 +1148,12 @@ function renderDetail(d) {
 
   let breakdown = '';
   if (b) {
-    const converted = b.currency !== b.settle_currency;
+    const chargeConverted = b.currency !== b.settle_currency;
     breakdown = `<section class="dw-sec"><h3>Payment breakdown</h3>
-      ${converted ? `<p class="hint">Charge was received in ${b.currency.toUpperCase()}, but the funds are paid out to you in ${b.settle_currency.toUpperCase()}.</p>` : ''}
+      ${chargeConverted ? `<p class="hint">Charge was received in ${b.currency.toUpperCase()}, but the funds are paid out to you in ${b.settle_currency.toUpperCase()}.</p>` : ''}
       <div class="bd">
-        <div class="bd-row"><div class="k">Payment amount${converted && b.exchange_rate ? `<small>1 ${b.currency.toUpperCase()} = ${b.exchange_rate} ${b.settle_currency.toUpperCase()}</small>` : ''}</div>
-          <div class="v">${converted ? `<span class="from">${esc(m(b.amount, b.currency))} →</span>` : ''}${esc(m(b.settle_amount, b.settle_currency))}</div></div>
+        <div class="bd-row"><div class="k">Payment amount${chargeConverted && b.exchange_rate ? `<small>1 ${b.currency.toUpperCase()} = ${b.exchange_rate} ${b.settle_currency.toUpperCase()}</small>` : ''}</div>
+          <div class="v">${chargeConverted ? `<span class="from">${esc(m(b.amount, b.currency))} →</span>` : ''}${esc(m(b.settle_amount, b.settle_currency))}</div></div>
         <details class="fees"><summary class="bd-row"><div class="k">Stripe fees<small>${b.settle_amount ? ((b.fee / b.settle_amount) * 100).toFixed(2) + '% of this payment' : ''}</small></div><div class="v">−${esc(m(b.fee, b.settle_currency))}</div></summary>
           ${b.fees.map((f) => `<div class="fee-row"><span>${esc(f.label)}</span><span>−${esc(m(f.amount, f.currency))}</span></div>`).join('')}
         </details>
@@ -1124,7 +1161,7 @@ function renderDetail(d) {
         ${b.refunded ? `<div class="bd-row bad"><div class="k">Refunded</div><div class="v">−${esc(m(b.refunded, b.settle_currency))}</div></div>
           <div class="bd-row total ${b.net_after_refunds < 0 ? 'bad' : 'good'}"><div class="k">You keep</div><div class="v">${esc(m(b.net_after_refunds, b.settle_currency))}</div></div>` : ''}
       </div>
-      ${b.refunded ? `<div class="callout bad">${ICON.info}<span>Stripe doesn't return its fees when you refund${converted ? ', and the exchange rate on the refund can differ' : ''}, so this payment ${b.net_after_refunds < 0 ? `cost you ${esc(m(-b.net_after_refunds, b.settle_currency))}` : `left you ${esc(m(b.net_after_refunds, b.settle_currency))}`}.</span></div>` : ''}
+      ${b.refunded ? `<div class="callout bad">${ICON.info}<span>Stripe doesn't return its fees when you refund${chargeConverted ? ', and the exchange rate on the refund can differ' : ''}, so this payment ${b.net_after_refunds < 0 ? `cost you ${esc(m(-b.net_after_refunds, b.settle_currency))}` : `left you ${esc(m(b.net_after_refunds, b.settle_currency))}`}.</span></div>` : ''}
       <div class="callout">${ICON.clock}<span>${b.funds_status === 'available' ? 'Funds became available' : 'Funds will be available'} in your Stripe balance on <b>${esc(fmtDate(b.available_on))}</b>.</span></div>
     </section>`;
   } else if (['failed', 'canceled'].includes(d.status)) {
@@ -1194,7 +1231,7 @@ $('curTabs').addEventListener('click', (e) => {
 });
 $('cur').addEventListener('change', () => { displayCur = $('cur').value; store.set('cur', displayCur); if (data) render(); });
 $('view').addEventListener('change', () => { store.set('view', $('view').value); active.clear(); if (data) render(); });
-$('days').addEventListener('change', () => load());
+$('days').addEventListener('change', () => { store.set('period', $('days').value); load(); });
 $('refresh').addEventListener('click', () => load(true));
 $('q').addEventListener('input', () => { if (data) render(); });
 let resizeT;

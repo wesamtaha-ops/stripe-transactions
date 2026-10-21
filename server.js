@@ -164,25 +164,24 @@ function refundStatus(charge) {
   return charge.refunded ? 'refunded' : 'partially refunded';
 }
 
-async function getTransactions(days, force) {
+// range: { from, to } in unix seconds (either may be missing); {} = all time.
+async function getTransactions(range, force) {
+  const from = range.from || 0, to = range.to || null;
   const productIds = readProducts();
-  const key = `${days}|${productIds.join(',')}`;
+  const key = `${from}-${to || ''}|${productIds.join(',')}`;
   const hit = cache.get(key);
   if (!force && hit && Date.now() - hit.at < CACHE_MS) return hit.data;
 
   const tracked = new Set(productIds);
-  const since = days ? Math.floor(Date.now() / 1000) - days * 86400 : 0; // 0 days = all time
+  const since = from;
+  const created = (extra) => ({ 'created[gte]': since, ...(to ? { 'created[lt]': to } : {}), ...extra });
 
   const [sessions, invoices, charges, refunds, intents, products] = await Promise.all([
-    listAll('/v1/checkout/sessions', {
-      status: 'complete',
-      'created[gte]': since,
-      'expand[]': ['data.line_items'],
-    }),
-    listAll('/v1/invoices', { 'created[gte]': since, 'expand[]': ['data.payments'] }),
-    listAll('/v1/charges', { 'created[gte]': since, 'expand[]': ['data.balance_transaction'] }),
-    listAll('/v1/refunds', { 'created[gte]': since, 'expand[]': ['data.balance_transaction'] }),
-    listAll('/v1/payment_intents', { 'created[gte]': since }),
+    listAll('/v1/checkout/sessions', created({ status: 'complete', 'expand[]': ['data.line_items'] })),
+    listAll('/v1/invoices', created({ 'expand[]': ['data.payments'] })),
+    listAll('/v1/charges', created({ 'expand[]': ['data.balance_transaction'] })),
+    listAll('/v1/refunds', created({ 'expand[]': ['data.balance_transaction'] })),
+    listAll('/v1/payment_intents', created({})),
     listAll('/v1/products', {}),
   ]);
 
@@ -358,7 +357,7 @@ async function getTransactions(days, force) {
   const data = {
     rows,
     tracked: productIds.map((id) => ({ id, name: names[id] || id })),
-    days,
+    range: { from: from || null, to },
     mode: isTestKey() ? 'test' : 'live',
     fetched_at: Date.now(),
     truncated: [sessions, invoices, charges, refunds, intents].some((list) => list.length >= MAX_PAGES * 100),
@@ -831,9 +830,11 @@ const server = http.createServer(async (req, res) => {
       return send(res, 500, { error: 'STRIPE_SECRET_KEY is not set. Copy .env.example to .env and add your key.' });
     }
     if (url.pathname === '/api/transactions' && req.method === 'GET') {
-      const raw = url.searchParams.get('days');
-      const days = raw === 'all' ? 0 : Math.min(Math.max(Number(raw) || 30, 1), 365);
-      const scoped = scopeFor(user, await getTransactions(days, url.searchParams.has('refresh')));
+      // from/to are unix seconds computed by the browser in the viewer's timezone; none = all time.
+      const num = (k) => { const v = Number(url.searchParams.get(k)); return Number.isInteger(v) && v > 0 ? v : null; };
+      const range = { from: num('from'), to: num('to') };
+      if (range.from && range.to && range.to <= range.from) return send(res, 400, { error: 'Invalid date range' });
+      const scoped = scopeFor(user, await getTransactions(range, url.searchParams.has('refresh')));
       const counts = {};
       for (const r of scoped.rows) if (r.settle_currency) counts[r.settle_currency] = (counts[r.settle_currency] || 0) + 1;
       const base = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0] || 'aed';
@@ -854,13 +855,13 @@ const server = http.createServer(async (req, res) => {
     }
     if (url.pathname === '/api/payouts' && req.method === 'GET') {
       const force = url.searchParams.has('refresh');
-      const [rows, pd] = await Promise.all([getTransactions(0, force).then((d) => scopeFor(user, d).rows), getPayoutData(force)]);
+      const [rows, pd] = await Promise.all([getTransactions({}, force).then((d) => scopeFor(user, d).rows), getPayoutData(force)]);
       return send(res, 200, payoutsFor(user, rows, pd));
     }
     const detail = url.pathname.match(/^\/api\/payments\/(pi_[A-Za-z0-9]+)$/);
     if (detail && req.method === 'GET') {
       // Only payments this user can see in the dashboard (all time) can be opened.
-      const visibleRows = scopeFor(user, await getTransactions(0, false)).rows.filter((r) => r.payment_intent === detail[1]);
+      const visibleRows = scopeFor(user, await getTransactions({}, false)).rows.filter((r) => r.payment_intent === detail[1]);
       if (!visibleRows.length) return send(res, 404, { error: 'Payment not found' });
       return send(res, 200, await getPaymentDetail(detail[1], visibleRows));
     }
