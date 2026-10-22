@@ -3,6 +3,9 @@ const crypto = require('node:crypto');
 // Verified against the supplied login-center-12 exports. Deleted ledgers are excluded.
 const LEDGERS = [
   { id: 31758052, account_id: 523, role: 'receivable', name: 'Stripe receivables' },
+  { id: 31758191, account_id: 523, role: 'receivable', name: 'Receivable - Starter Plan' },
+  { id: 31758192, account_id: 523, role: 'receivable', name: 'Receivable - Growth Plan' },
+  { id: 31758193, account_id: 523, role: 'receivable', name: 'Receivable - Pro Plan' },
   { id: 31758060, account_id: 522, role: 'bank', name: 'Wio Bank' },
   { id: 31758096, account_id: 538, role: 'fee', name: 'Stripe — Payment gateways share' },
   ...['Starter', 'Growth', 'Teams', 'Pro', 'Enterprise'].map((name, i) =>
@@ -11,6 +14,14 @@ const LEDGERS = [
   { id: 31758084, account_id: 529, role: 'income', name: 'Income - Sampling Post Paid' },
 ];
 const incomeIds = new Set(LEDGERS.filter((l) => l.role === 'income').map((l) => l.id));
+// Invoice: debit the plan receivable, credit income. Payout: debit bank, credit that receivable.
+const SUBSCRIPTION_RECEIVABLE = new Map([
+  [31758077, 31758191],
+  [31758078, 31758192],
+  [31758080, 31758193],
+]);
+const STRIPE_RECEIVABLE = 31758052;
+const INCOME_FOR_RECEIVABLE = new Map([...SUBSCRIPTION_RECEIVABLE].map(([incomeId, receivableId]) => [receivableId, incomeId]));
 const productKey = (row) => row.product_id || `name:${row.product}`;
 const idOf = (value) => typeof value === 'string' ? value : value?.id;
 const digest = (value) => crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -31,6 +42,8 @@ function canRebuildRefund(entry, receipt, entries) {
   if (JSON.stringify(previous) !== JSON.stringify(current)) return false;
   const amount = (lines, ledger) => lines.filter((line) => line.ledger_id === ledger).reduce((n, line) => n + line.debit - line.credit, 0);
   if (amount(entry.lines, 31758052) >= 0 || amount(receipt.financial_record.lines, 31758052) !== amount(entry.lines, 31758052)) return false;
+  const classified = (lines) => lines.filter((l) => incomeIds.has(l.ledger_id) || INCOME_FOR_RECEIVABLE.has(l.ledger_id)).map((l) => l.ledger_id).sort().join(',');
+  if (classified(entry.lines) !== classified(receipt.financial_record.lines)) return false;
   const original = entries.find((candidate) => candidate.type === 'payment' && entry.dependencies.includes(candidate.key));
   if (!original) return false;
   return [...incomeIds].every((id) => amount(original.lines, id) + amount(entry.lines, id) === 0);
@@ -66,6 +79,16 @@ function scale(total, numerator, denominator) {
   let q = n / d, remainder = n % d;
   if (remainder < 0n) { q--; remainder += d; }
   return Number(q + (remainder * 2n >= d ? 1n : 0n));
+}
+
+function isPlanIncome(incomeId) {
+  return LEDGERS.some((ledger) => ledger.id === incomeId && ledger.account_id === 528);
+}
+
+function holdingLedger(row, mappings) {
+  const incomeId = mappings[productKey(row)];
+  if (row.source === 'Subscription' && isPlanIncome(incomeId)) return SUBSCRIPTION_RECEIVABLE.get(incomeId) || null;
+  return STRIPE_RECEIVABLE;
 }
 
 function suggestion(row) {
@@ -134,12 +157,27 @@ function buildPlan({ allRows, visibleRows, payouts, contents, mappings, account,
       addIssue(source, `Missing settlement amounts or settlement currency differs from ${currency.toUpperCase()}.`); continue;
     }
     if (rows.some((r) => !incomeIds.has(mappings[productKey(r)]))) { addIssue(source, 'Choose an income ledger for every product in this payment.'); continue; }
-    const amounts = new Map();
-    rows.forEach((r) => amounts.set(mappings[productKey(r)], (amounts.get(mappings[productKey(r)]) || 0) + r.settle_gross));
-    const gross = rows.reduce((n, r) => n + r.settle_gross, 0);
+    const unheld = rows.filter((r) => !holdingLedger(r, mappings));
+    if (unheld.length) {
+      const names = [...new Set(unheld.map((r) => LEDGERS.find((l) => l.id === mappings[productKey(r)]).name))];
+      addIssue(source, `Subscription income for ${names.join(', ')} is posted against its receivable. Add that receivable ledger before syncing.`);
+      continue;
+    }
+    const incomeAmounts = new Map();
+    const holdings = new Map();
+    for (const r of rows) {
+      const incomeId = mappings[productKey(r)];
+      incomeAmounts.set(incomeId, (incomeAmounts.get(incomeId) || 0) + r.settle_gross);
+      const holdingId = holdingLedger(r, mappings);
+      holdings.set(holdingId, (holdings.get(holdingId) || 0) + r.settle_gross);
+    }
+    const subscribed = rows.some((r) => r.source === 'Subscription' && isPlanIncome(mappings[productKey(r)]));
     const entry = create({ type: 'payment', id: source, timestamp: rows[0].created,
-      reason: memoReason(`Stripe payment ${source} — ${[...new Set(rows.map((r) => r.product))].join(', ')}`, rows),
-      lines: [line(31758052, gross), ...[...amounts].sort(([a], [b]) => a - b).map(([id, amount]) => line(id, -amount))] });
+      reason: memoReason(`Stripe payment ${source} — ${[...new Set(rows.map((r) => r.product))].join(', ')}${subscribed ? '; invoiced to plan receivable' : ''}`, rows),
+      lines: [
+        ...[...holdings].sort(([a], [b]) => a - b).map(([id, amount]) => line(id, amount)),
+        ...[...incomeAmounts].sort(([a], [b]) => a - b).map(([id, amount]) => line(id, -amount)),
+      ] });
     entries.push(entry); keys.set(source, entry.key);
   }
   const refundState = new Map();
@@ -159,20 +197,39 @@ function buildPlan({ allRows, visibleRows, payouts, contents, mappings, account,
     if (!Number.isSafeInteger(paidOriginal) || paidOriginal <= 0 || !Number.isSafeInteger(row.amount) || row.amount >= 0 || row.currency !== originals[0].currency || originals.some((r) => r.currency !== row.currency) || previous.refunded - row.amount > paidOriginal) {
       addIssue(row.id, 'Refund amount/currency cannot be reconciled with the original payment.'); blockedRefunds.add(source); continue;
     }
-    const income = new Map();
-    originals.forEach((r) => income.set(mappings[productKey(r)], (income.get(mappings[productKey(r)]) || 0) + r.settle_gross));
-    const ledgerAmounts = [...income].sort(([a], [b]) => a - b);
-    const gross = ledgerAmounts.reduce((n, [, value]) => n + value, 0);
+    if (originals.some((r) => !holdingLedger(r, mappings) || !incomeIds.has(mappings[productKey(r)]))) { addIssue(row.id, 'Original subscription has no receivable ledger.'); blockedRefunds.add(source); continue; }
+    const groups = new Map();
+    for (const original of originals) {
+      const incomeId = mappings[productKey(original)];
+      const holdingId = holdingLedger(original, mappings);
+      const key = `${holdingId}:${incomeId}`;
+      const group = groups.get(key) || { holdingId, incomeId, weight: 0 };
+      group.weight += original.settle_gross;
+      groups.set(key, group);
+    }
+    const ordered = [...groups.values()].sort((a, b) => a.incomeId - b.incomeId || a.holdingId - b.holdingId);
+    const gross = ordered.reduce((n, group) => n + group.weight, 0);
     const refunded = previous.refunded - row.amount;
     // Allocate cumulative refunds, then take the increment. Multiple partial
-    // refunds therefore cancel the original ledger amounts exactly at 100%.
-    const cumulative = allocate(scale(gross, refunded, paidOriginal), ledgerAmounts.map(([, amount]) => amount));
+    // refunds therefore cancel the original income exactly at 100%.
+    const cumulative = allocate(scale(gross, refunded, paidOriginal), ordered.map((group) => group.weight));
     const shares = cumulative.map((value, i) => value - (previous.allocations[i] || 0));
     const reversal = shares.reduce((n, value) => n + value, 0);
     const settlementAdjustment = -row.settle_gross - reversal;
+    const settlement = allocate(-row.settle_gross, ordered.map((group) => group.weight));
+    const holdingCredits = new Map();
+    const incomeReversal = new Map();
+    ordered.forEach((group, i) => {
+      holdingCredits.set(group.holdingId, (holdingCredits.get(group.holdingId) || 0) + settlement[i]);
+      incomeReversal.set(group.incomeId, (incomeReversal.get(group.incomeId) || 0) + shares[i]);
+    });
     const entry = create({ type: 'refund', id: row.source_id, timestamp: row.created,
       reason: memoReason(`Stripe refund ${row.source_id} — reversal of ${source}${settlementAdjustment ? '; exchange difference in Stripe share' : ''}`, [...originals, row]),
-      lines: [line(31758052, row.settle_gross), ...ledgerAmounts.map(([id], i) => line(id, shares[i])), ...(settlementAdjustment ? [line(31758096, settlementAdjustment)] : [])],
+      lines: [
+        ...[...holdingCredits].sort(([a], [b]) => a - b).map(([id, amount]) => line(id, -amount)),
+        ...[...incomeReversal].sort(([a], [b]) => a - b).map(([id, amount]) => line(id, amount)),
+        ...(settlementAdjustment ? [line(31758096, settlementAdjustment)] : []),
+      ],
       dependencies: [...new Set([keys.get(source), ...(previous.key ? [previous.key] : [])])].sort() });
     refundState.set(source, { refunded, allocations: cumulative, key: entry.key });
     entries.push(entry); keys.set(row.source_id, entry.key);
@@ -208,15 +265,25 @@ function buildPlan({ allRows, visibleRows, payouts, contents, mappings, account,
     if (included.some((t) => sources.get(idOf(t.source)).reduce((n, r) => n + r.settle_gross, 0) !== t.amount) || [...included, ...serviceFees].some((t) => ![t.amount, t.fee, t.net].every(Number.isSafeInteger) || t.amount - t.fee !== t.net)) {
       addIssue(payout.id, 'Payment/refund totals differ from the payout’s balance transactions.'); continue;
     }
-    const gross = included.reduce((n, t) => n + t.amount, 0);
     // A service-fee transaction has a negative amount and may carry its own VAT
     // in `fee`. Its complete cost is -net, so VAT must not be counted twice.
     const serviceFeeNet = serviceFees.reduce((n, t) => n + t.net, 0);
     const fees = included.reduce((n, t) => n + t.fee, 0) - serviceFeeNet;
     const bank = included.reduce((n, t) => n + t.net, 0) + serviceFeeNet;
+    // Clear the same receivable the invoice or refund posted. Subscription plans
+    // use their own receivable; other payments use Stripe receivables.
+    const held = new Map();
+    for (const txn of included) {
+      const entry = entries.find((candidate) => candidate.key === keys.get(idOf(txn.source)));
+      for (const journalLine of entry.lines) {
+        if (journalLine.ledger_id !== STRIPE_RECEIVABLE && !INCOME_FOR_RECEIVABLE.has(journalLine.ledger_id)) continue;
+        held.set(journalLine.ledger_id, (held.get(journalLine.ledger_id) || 0) + journalLine.debit - journalLine.credit);
+      }
+    }
+    const clearing = [...held].sort(([a], [b]) => a - b).flatMap(([id, signed]) => (signed ? [line(id, -signed)] : []));
     entries.push(create({ type: 'payout', id: `${payout.id}_${scopeKey}`, timestamp: payout.arrival_date,
       reason: memoReason(`Stripe payout ${payout.id} — Sentink share; bank ${bank / 100} ${currency.toUpperCase()}`, included.flatMap((t) => sources.get(idOf(t.source)))),
-      lines: [line(31758060, bank), line(31758096, fees), line(31758052, -gross)],
+      lines: [line(31758060, bank), line(31758096, fees), ...clearing],
       dependencies: [...new Set(included.map((t) => keys.get(idOf(t.source))))].sort() }));
   }
   return { entries, issues, skipped };

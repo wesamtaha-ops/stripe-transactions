@@ -614,9 +614,9 @@
   </div>
   <p id="mmMessage" role="status" aria-live="polite" hidden></p>
   <div class="mm-body">
-    <p id="mmPolicy" class="report-note">Payments → Stripe receivables + income. Refunds reverse the original income. Paid payouts → Wio Bank + Stripe fees. All imported entries are Pending.</p>
+    <p id="mmPolicy" class="report-note">Subscription invoices debit the plan receivable and credit income. The payout debits Wio Bank and credits that receivable. Other payments debit Stripe receivables and credit income. Refunds reverse the original income. Imported entries stay Pending.</p>
     <h3>Product income ledgers</h3>
-    <p class="report-note">Review the suggested ledgers. Saving and previewing confirms these assignments.</p>
+    <p class="report-note">Review the suggested ledgers. Starter, Growth and Pro use the matching receivable until the payout reaches the bank. Saving and previewing confirms these assignments.</p>
     <div id="mmMappings" class="mm-mappings"></div>
     <div id="mmPreview"></div>
   </div>
@@ -1393,7 +1393,7 @@ $('mmOpen').addEventListener('click', async () => {
   $('mmDialog').showModal(); mmControls(true); mmMessage('Loading product mappings…');
   try {
     mmConfig = await mmApi(''); mmMappings(mmConfig.products);
-    $('mmPolicy').textContent = `Payments → Stripe receivables + income. Refunds reverse the original income. Paid payouts → Wio Bank + Stripe fees. All imported entries are Pending. Settlement currency: ${(mmConfig.currency || 'aed').toUpperCase()}.`;
+    $('mmPolicy').textContent = `Subscription invoices debit the plan receivable and credit income. The payout debits Wio Bank and credits that receivable. Other payments debit Stripe receivables and credit income. Refunds reverse the original income. Imported entries stay Pending. Settlement currency: ${(mmConfig.currency || 'aed').toUpperCase()}.`;
     mmMessage(mmConfig.configured ? 'Review the income ledgers, then create a preview.' : 'Money Master connection needs setup. You can save mappings and preview; posting is disabled until connected.');
   } catch (error) { mmMessage(error.message, 'error'); }
   finally { mmControls(false); }

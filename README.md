@@ -66,8 +66,10 @@ Checkout line items. Review existing manually entered Stripe journals before the
 only entries created through this bridge have duplicate-detection receipts.
 
 1. Review each product's income ledger, then select **Save mappings & preview**. Suggestions use
-   plan names and map sampling/top-up products to **Sampling Pre Paid**. A suggestion is only
-   saved when you press this button; unknown products remain unmapped until selected.
+   plan names and map sampling/top-up products to **Sampling Pre Paid**. A paid Starter, Growth
+   or Pro subscription debits that plan's receivable and credits its income. The payout credits
+   the receivable and debits Wio Bank. A suggestion is only saved when you press this button;
+   unknown products remain unmapped until selected.
 2. Expand preview entries to inspect their debit and credit lines. Already synced journals are
    skipped. Unmapped payments and unreconciled payouts appear under items needing review.
 3. Select **Sync ready entries** to import the reviewed entries as **Pending** (`approved = 0`).
@@ -91,10 +93,15 @@ exports, using only active login-center-12 ledgers:
 | Wio Bank | 522 | 31758060 |
 | Stripe fees / Payment gateways share | 538 | 31758096 |
 | Starter, Growth, Teams, Pro, Enterprise income | 528 | 31758077–31758081 |
+| Starter, Growth and Pro receivables | 523 | 31758191–31758193 |
 | Sampling Pre Paid / Post Paid income | 529 | 31758082 / 31758084 |
 
-Successful payments **debit receivables and credit income** at gross value in Stripe's actual
-settlement currency. The refund policy keeps the original payment and creates an opposite
+Checkout and sampling payments **debit Stripe receivables and credit income** at gross value in
+Stripe's actual settlement currency. A paid **subscription** invoice for Starter, Growth or Pro
+**debits that plan's receivable and credits its income** — income is the invoiced work, and the
+receivable is its opposite. The paid payout then **debits Wio Bank and Stripe fees and credits
+the plan receivable**. Teams and Enterprise subscriptions need a matching receivable ledger
+before they can sync. The refund policy keeps the original payment and creates an opposite
 journal for each **successful** refund. A full refund cancels the original income exactly;
 partial refunds reverse only the refunded portion, allocated cumulatively so a series of partial
 refunds leaves no rounding remainder when it reaches the full amount. An exchange-rate
@@ -108,8 +115,10 @@ details are labelled `not provided`. Payout memos list customers from the includ
 very large lists show an overflow count. Details are kept server-side until shown to the
 authorised Sentink dashboard user.
 
-Only **paid** payouts **debit Wio Bank and Stripe fees and credit receivables**. For a payout
-containing both Sentink and Plus, only the Sentink share is posted to Wio Bank and fees. The
+Only **paid** payouts **debit Wio Bank and Stripe fees and credit the receivable** that the
+original invoice posted: the plan receivable for Starter, Growth and Pro, and Stripe receivables
+for other payments. For a payout containing both Sentink and Plus, only the Sentink share is
+posted to Wio Bank and fees. The
 full payout must reconcile first. Fees are recognised on payout, as requested; unpayouted
 receivables therefore remain at gross value. Posting dates use Asia/Dubai, matching Money Master.
 For a batch containing only Sentink payments/refunds, separate Stripe Billing/FX fees and

@@ -24,6 +24,108 @@ test('payment recognises gross settlement in AED without expensing fees early', 
   assert.match(result.entries[0].reason, /jane@example\.com/);
 });
 
+test('subscription invoice debits the plan receivable and the payout credits it to the bank', () => {
+  const row = payment({ source: 'Subscription', product: 'Sentink Starter' });
+  const result = plan({ allRows: [row], visibleRows: [row],
+    payouts: [{ id: 'po_sub', status: 'paid', automatic: true, amount: 35525, currency: 'aed', arrival_date: 1780100000 }],
+    contents: { po_sub: [{ source: 'ch_one', type: 'charge', amount: 36725, fee: 1200, net: 35525, currency: 'aed' }] } });
+  assert.equal(result.issues.length, 0);
+  const charge = result.entries.find((entry) => entry.type === 'payment');
+  const payout = result.entries.find((entry) => entry.type === 'payout');
+  assert.equal(amount(charge, 31758191), 36725);
+  assert.equal(amount(charge, 31758077), -36725);
+  assert.equal(amount(charge, 31758052), 0);
+  assert.equal(amount(payout, 31758060), 35525);
+  assert.equal(amount(payout, 31758096), 1200);
+  assert.equal(amount(payout, 31758191), -36725);
+  assert.equal(amount(payout, 31758077), 0);
+  assert.equal(amount(payout, 31758052), 0);
+  assert.equal(balance(charge), 0);
+  assert.equal(balance(payout), 0);
+  assert.match(charge.reason, /invoiced to plan receivable/);
+});
+
+test('subscription refund reverses income and the payout clears the remaining receivable', () => {
+  const row = payment({ source: 'Subscription', amount: 10000, currency: 'aed', settle_gross: 10000, fee: 300, net: 9700 });
+  const refund = { id: 're_sub', source_id: 're_sub', original_charge: 'ch_one', kind: 'refund', status: 'refund', amount: -4000, currency: 'aed', settle_gross: -4000, settle_currency: 'aed', created: row.created + 10 };
+  const result = plan({ allRows: [row, refund], visibleRows: [row, refund],
+    payouts: [{ id: 'po_sub', status: 'paid', automatic: true, amount: 5700, currency: 'aed', arrival_date: 1780100000 }],
+    contents: { po_sub: [
+      { source: 'ch_one', type: 'charge', amount: 10000, fee: 300, net: 9700, currency: 'aed' },
+      { source: 're_sub', type: 'refund', amount: -4000, fee: 0, net: -4000, currency: 'aed' },
+    ] } });
+  assert.equal(result.issues.length, 0);
+  const reversal = result.entries.find((entry) => entry.type === 'refund');
+  const payout = result.entries.find((entry) => entry.type === 'payout');
+  assert.equal(amount(reversal, 31758077), 4000);
+  assert.equal(amount(reversal, 31758191), -4000);
+  assert.equal(amount(payout, 31758191), -6000);
+  assert.equal(amount(payout, 31758077), 0);
+  assert.equal(amount(payout, 31758052), 0);
+  result.entries.forEach((entry) => assert.equal(balance(entry), 0));
+  assert.equal(result.entries.reduce((sum, entry) => sum + amount(entry, 31758191), 0), 0);
+  assert.equal(result.entries.reduce((sum, entry) => sum + amount(entry, 31758077), 0), -6000);
+});
+
+test('a refund after the payout debits income and the later payout returns the receivable against the bank', () => {
+  const row = payment({ source: 'Subscription', amount: 10000, currency: 'aed', settle_gross: 10000, fee: 0, net: 10000 });
+  const refund = { id: 're_later', source_id: 're_later', original_charge: 'ch_one', kind: 'refund', status: 'refund', amount: -4000, currency: 'aed', settle_gross: -4000, settle_currency: 'aed', created: row.created + 10 };
+  const result = plan({ allRows: [row, refund], visibleRows: [row, refund],
+    payouts: [
+      { id: 'po_paid', status: 'paid', automatic: true, amount: 10000, currency: 'aed', arrival_date: 1780100000 },
+      { id: 'po_refund', status: 'paid', automatic: true, amount: -4000, currency: 'aed', arrival_date: 1780200000 },
+    ],
+    contents: {
+      po_paid: [{ source: 'ch_one', type: 'charge', amount: 10000, fee: 0, net: 10000, currency: 'aed' }],
+      po_refund: [{ source: 're_later', type: 'refund', amount: -4000, fee: 0, net: -4000, currency: 'aed' }],
+    } });
+  assert.equal(result.issues.length, 0);
+  const charge = result.entries.find((entry) => entry.type === 'payment');
+  const reversal = result.entries.find((entry) => entry.type === 'refund');
+  const first = result.entries.find((entry) => entry.source_id === 'po_paid_scope');
+  const second = result.entries.find((entry) => entry.source_id === 'po_refund_scope');
+  assert.equal(amount(charge, 31758191), 10000);
+  assert.equal(amount(charge, 31758077), -10000);
+  assert.equal(amount(first, 31758191), -10000);
+  assert.equal(amount(first, 31758077), 0);
+  assert.equal(amount(reversal, 31758077), 4000);
+  assert.equal(amount(reversal, 31758191), -4000);
+  assert.equal(amount(second, 31758191), 4000);
+  assert.equal(amount(second, 31758060), -4000);
+  assert.equal(result.entries.reduce((sum, entry) => sum + amount(entry, 31758077), 0), -6000);
+  assert.equal(result.entries.reduce((sum, entry) => sum + amount(entry, 31758191), 0), 0);
+  result.entries.forEach((entry) => assert.equal(balance(entry), 0));
+});
+
+test('sampling uses Stripe receivables while a subscription uses the plan receivable', () => {
+  const subscription = payment({ source: 'Subscription', amount: 10000, currency: 'aed', settle_gross: 10000, fee: 300, net: 9700 });
+  const sample = payment({ id: 'li_sample', source_id: 'ch_sample', product_id: 'prod_sample', product: 'Balance Top-Up', source: 'Checkout', amount: 5000, currency: 'aed', settle_gross: 5000, fee: 150, net: 4850 });
+  const result = plan({ allRows: [subscription, sample], visibleRows: [subscription, sample], mappings: { prod_one: 31758077, prod_sample: 31758082 },
+    payouts: [{ id: 'po_mix', status: 'paid', automatic: true, amount: 14550, currency: 'aed', arrival_date: 1780100000 }],
+    contents: { po_mix: [
+      { source: 'ch_one', type: 'charge', amount: 10000, fee: 300, net: 9700, currency: 'aed' },
+      { source: 'ch_sample', type: 'charge', amount: 5000, fee: 150, net: 4850, currency: 'aed' },
+    ] } });
+  assert.equal(result.issues.length, 0);
+  const samplePayment = result.entries.find((entry) => entry.source_id === 'ch_sample');
+  const payout = result.entries.find((entry) => entry.type === 'payout');
+  assert.equal(amount(samplePayment, 31758052), 5000);
+  assert.equal(amount(samplePayment, 31758082), -5000);
+  assert.equal(amount(payout, 31758052), -5000);
+  assert.equal(amount(payout, 31758191), -10000);
+  assert.equal(amount(payout, 31758077), 0);
+  assert.equal(amount(payout, 31758082), 0);
+  assert.equal(balance(payout), 0);
+});
+
+test('Teams and Enterprise subscriptions wait for a receivable ledger', () => {
+  for (const incomeId of [31758079, 31758081]) {
+    const result = plan({ mappings: { prod_one: incomeId }, allRows: [payment({ source: 'Subscription' })], visibleRows: [payment({ source: 'Subscription' })] });
+    assert.equal(result.entries.length, 0);
+    assert.match(result.issues[0].message, /receivable/);
+  }
+});
+
 test('mixed payout posts only Sentink bank and fees, excluding Plus', () => {
   const row = payment(), excluded = payment({ id: 'cs_two:li_two', source_id: 'ch_plus', product: 'Sentink Plus', product_id: 'prod_plus', settle_gross: 10000 });
   const result = plan({ allRows: [row, excluded], visibleRows: [row],

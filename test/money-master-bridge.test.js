@@ -1,7 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
-const { existsSync } = require('node:fs');
+const { existsSync, readFileSync } = require('node:fs');
 const http = require('node:http');
 const path = require('node:path');
 const os = require('node:os');
@@ -10,6 +10,12 @@ const { once } = require('node:events');
 const { buildPlan, LEDGERS, financialDigest, digest } = require('../money-master');
 const bridgeSource = path.resolve(__dirname, '../../accountant/v2/api/stripe_sync.php');
 const canRun = existsSync(bridgeSource) && spawnSync('php', ['--version']).status === 0;
+
+test('bridge allowlist includes the subscription receivable ledgers', { skip: !existsSync(bridgeSource) }, () => {
+  const source = readFileSync(bridgeSource, 'utf8');
+  for (const id of [31758191, 31758192, 31758193]) assert.match(source, new RegExp(`\\b${id}\\b`));
+  assert.match(source, /array_merge\(\[31758052, 31758060, 31758096\], \$planReceivables\)/);
+});
 
 test('real PHP bridge: authentication, balanced storage, receipts, conflicts and rollback', { skip: !canRun }, async (t) => {
   const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'stripe-bridge-test-'));
