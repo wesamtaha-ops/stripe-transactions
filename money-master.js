@@ -85,9 +85,12 @@ function isPlanIncome(incomeId) {
   return LEDGERS.some((ledger) => ledger.id === incomeId && ledger.account_id === 528);
 }
 
+// The receivable an invoice debits (and its payout later credits). Plans with
+// their own receivable use it; everything else, including Teams/Enterprise
+// subscriptions, uses Stripe receivables so no payment or payout is held back.
 function holdingLedger(row, mappings) {
   const incomeId = mappings[productKey(row)];
-  if (row.source === 'Subscription' && isPlanIncome(incomeId)) return SUBSCRIPTION_RECEIVABLE.get(incomeId) || null;
+  if (row.source === 'Subscription' && isPlanIncome(incomeId)) return SUBSCRIPTION_RECEIVABLE.get(incomeId) || STRIPE_RECEIVABLE;
   return STRIPE_RECEIVABLE;
 }
 
@@ -157,12 +160,6 @@ function buildPlan({ allRows, visibleRows, payouts, contents, mappings, account,
       addIssue(source, `Missing settlement amounts or settlement currency differs from ${currency.toUpperCase()}.`); continue;
     }
     if (rows.some((r) => !incomeIds.has(mappings[productKey(r)]))) { addIssue(source, 'Choose an income ledger for every product in this payment.'); continue; }
-    const unheld = rows.filter((r) => !holdingLedger(r, mappings));
-    if (unheld.length) {
-      const names = [...new Set(unheld.map((r) => LEDGERS.find((l) => l.id === mappings[productKey(r)]).name))];
-      addIssue(source, `Subscription income for ${names.join(', ')} is posted against its receivable. Add that receivable ledger before syncing.`);
-      continue;
-    }
     const incomeAmounts = new Map();
     const holdings = new Map();
     for (const r of rows) {
@@ -171,7 +168,7 @@ function buildPlan({ allRows, visibleRows, payouts, contents, mappings, account,
       const holdingId = holdingLedger(r, mappings);
       holdings.set(holdingId, (holdings.get(holdingId) || 0) + r.settle_gross);
     }
-    const subscribed = rows.some((r) => r.source === 'Subscription' && isPlanIncome(mappings[productKey(r)]));
+    const subscribed = rows.some((r) => r.source === 'Subscription' && SUBSCRIPTION_RECEIVABLE.has(mappings[productKey(r)]));
     const entry = create({ type: 'payment', id: source, timestamp: rows[0].created,
       reason: memoReason(`Stripe payment ${source} — ${[...new Set(rows.map((r) => r.product))].join(', ')}${subscribed ? '; invoiced to plan receivable' : ''}`, rows),
       lines: [

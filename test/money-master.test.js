@@ -118,11 +118,21 @@ test('sampling uses Stripe receivables while a subscription uses the plan receiv
   assert.equal(balance(payout), 0);
 });
 
-test('Teams and Enterprise subscriptions wait for a receivable ledger', () => {
+test('Teams and Enterprise subscriptions use Stripe receivables and their payout posts', () => {
   for (const incomeId of [31758079, 31758081]) {
-    const result = plan({ mappings: { prod_one: incomeId }, allRows: [payment({ source: 'Subscription' })], visibleRows: [payment({ source: 'Subscription' })] });
-    assert.equal(result.entries.length, 0);
-    assert.match(result.issues[0].message, /receivable/);
+    const row = payment({ source: 'Subscription' });
+    const result = plan({ mappings: { prod_one: incomeId }, allRows: [row], visibleRows: [row],
+      payouts: [{ id: 'po_one', status: 'paid', automatic: true, amount: 35525, currency: 'aed', arrival_date: 1780100000 }],
+      contents: { po_one: [{ source: 'ch_one', type: 'charge', amount: 36725, fee: 1200, net: 35525, currency: 'aed' }] } });
+    assert.equal(result.issues.length, 0);
+    const invoice = result.entries.find((e) => e.type === 'payment');
+    assert.equal(amount(invoice, 31758052), 36725);   // Dr Stripe receivables
+    assert.equal(amount(invoice, incomeId), -36725);  // Cr plan income
+    const payout = result.entries.find((e) => e.type === 'payout');
+    assert.equal(amount(payout, 31758060), 35525);    // Dr Wio Bank
+    assert.equal(amount(payout, 31758096), 1200);     // Dr Stripe share
+    assert.equal(amount(payout, 31758052), -36725);   // Cr Stripe receivables
+    assert.equal(balance(payout), 0);
   }
 });
 
