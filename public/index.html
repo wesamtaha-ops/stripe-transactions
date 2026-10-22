@@ -3,235 +3,1319 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Product Transactions</title>
+<title>Stripe Transactions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #f6f7f9; --surface: #fff; --text: #1a1f36; --muted: #697386; --border: #e3e8ee;
-    --accent: #635bff; --accent-soft: #eeedff; --ok: #0e7c4a; --warn: #a15c07; --err: #c0123c;
+    --bg: #f5f6f8; --surface: #ffffff; --surface-2: #f9fafb; --text: #111827; --text-2: #4b5563; --muted: #8a93a3;
+    --border: #e7e9ee; --border-strong: #d6d9e0;
+    --accent: #635bff; --accent-2: #8b5cf6; --accent-soft: #efeeff; --accent-ink: #4f46e5;
+    --refund: #e5484d; --refund-soft: #fdecec;
+    --ok: #12805c; --ok-soft: #e3f6ee; --warn: #a15c07; --warn-soft: #fdf1df; --err: #c62f35; --err-soft: #fdecec;
+    --neutral-soft: #eef0f3;
+    --shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 1px 3px rgba(16, 24, 40, .06);
+    --shadow-lg: 0 12px 32px -12px rgba(16, 24, 40, .25);
+    --radius: 14px;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #0f1218; --surface: #171b24; --text: #e6e9ef; --muted: #8b93a7; --border: #262c38;
-      --accent: #8c86ff; --accent-soft: #24223f; --ok: #4cc38a; --warn: #e3a54a; --err: #ff6b8a;
+      --bg: #0c0e13; --surface: #151821; --surface-2: #1a1e29; --text: #eef0f4; --text-2: #b4bac6; --muted: #7d8595;
+      --border: #242936; --border-strong: #303747;
+      --accent: #7b74f5; --accent-2: #9b7bff; --accent-soft: #23213d; --accent-ink: #b3aeff;
+      --refund: #ec5a60; --refund-soft: #3a1c20;
+      --ok: #4cc38a; --ok-soft: #13301f; --warn: #e3a54a; --warn-soft: #36270f; --err: #ff7a80; --err-soft: #3a1c20;
+      --neutral-soft: #222735;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .3);
+      --shadow-lg: 0 16px 40px -12px rgba(0, 0, 0, .6);
     }
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; }
-  .wrap { max-width: 1180px; margin: 0 auto; padding: 24px 16px 48px; }
-  header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; justify-content: space-between; margin-bottom: 20px; }
-  h1 { font-size: 20px; margin: 0; }
-  .badge { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; padding: 2px 8px; border-radius: 99px; margin-left: 8px; vertical-align: middle; }
-  .badge.test { background: #fff1d6; color: #8a5300; } .badge.live { background: #d7f7e6; color: #0b6b3f; }
-  .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-  select, input[type=search], button { font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; }
-  button { cursor: pointer; } button:hover { border-color: var(--accent); }
-  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
-  .logout { margin: 0; } .logout button { width: 100%; }
-  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
-  .chip { border: 1px solid var(--border); background: var(--surface); border-radius: 99px; padding: 5px 12px; cursor: pointer; user-select: none; }
-  .chip.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
-  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
-  .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
-  .kpi .label { color: var(--muted); font-size: 12px; }
-  .kpi .value { font-size: 22px; font-weight: 650; margin-top: 4px; font-variant-numeric: tabular-nums; }
-  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+  button, input, select { font: inherit; color: inherit; }
+  a { color: var(--accent-ink); text-decoration: none; }
+  svg.i { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* ----- app bar ----- */
+  .appbar { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--surface) 85%, transparent); backdrop-filter: saturate(1.4) blur(10px); border-bottom: 1px solid var(--border); }
+  .appbar-in { max-width: 1240px; margin: 0 auto; padding: 12px 24px; display: flex; align-items: center; gap: 12px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; font-size: 15px; }
+  .logo { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; color: #fff; background: linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow: 0 4px 12px -4px var(--accent); }
+  .logo svg { width: 17px; height: 17px; }
+  .mode { font-size: 11px; font-weight: 600; letter-spacing: .02em; padding: 3px 9px 3px 8px; border-radius: 99px; display: inline-flex; align-items: center; gap: 6px; }
+  .mode::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .mode.live { background: var(--ok-soft); color: var(--ok); } .mode.test { background: var(--warn-soft); color: var(--warn); }
+  .spacer { flex: 1; }
+  .who { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-2); white-space: nowrap; }
+  .who .av { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 12px; background: var(--neutral-soft); color: var(--text); text-transform: uppercase; }
+  .who .scope { font-size: 11.5px; color: var(--accent-ink); background: var(--accent-soft); padding: 2px 8px; border-radius: 99px; font-weight: 600; }
+  .updated { color: var(--muted); font-size: 12px; white-space: nowrap; }
+  .icon-btn { height: 36px; min-width: 36px; padding: 0 10px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); cursor: pointer; color: var(--text-2); font-weight: 500; transition: border-color .15s, color .15s, background .15s; }
+  .icon-btn:hover { border-color: var(--border-strong); color: var(--text); }
+  .icon-btn.spin svg { animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .logout { margin: 0; display: contents; }
+
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 24px 24px 56px; }
+  .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -.02em; margin: 0; }
+  .sub { color: var(--muted); margin: 2px 0 0; }
+
+  /* ----- toolbar ----- */
+  .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; }
+  .field { position: relative; display: flex; align-items: center; }
+  .field > svg { position: absolute; left: 11px; color: var(--muted); pointer-events: none; }
+  .field select, .field input { height: 38px; border: 1px solid var(--border); background: var(--surface); border-radius: 10px; padding: 0 12px 0 34px; outline: none; box-shadow: var(--shadow); transition: border-color .15s, box-shadow .15s; }
+  .field select { appearance: none; -webkit-appearance: none; padding-right: 32px; cursor: pointer; font-weight: 500; }
+  .field .chev { left: auto; right: 10px; }
+  .field select:focus, .field input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .field.search { flex: 1; min-width: 200px; } .field.search input { width: 100%; }
+  .seg { display: inline-flex; padding: 3px; gap: 2px; background: var(--neutral-soft); border-radius: 11px; }
+  .seg button { border: 0; background: none; padding: 6px 12px; border-radius: 8px; font-weight: 500; color: var(--text-2); cursor: pointer; white-space: nowrap; }
+  .seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+  .btn-primary { height: 38px; padding: 0 14px; display: inline-flex; align-items: center; gap: 8px; border: 0; border-radius: 10px; background: var(--accent); color: #fff; font-weight: 600; cursor: pointer; box-shadow: 0 4px 12px -6px var(--accent); }
+  .btn-primary:hover { filter: brightness(1.07); }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+  .chip { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--border); background: var(--surface); border-radius: 99px; padding: 5px 12px 5px 6px; cursor: pointer; user-select: none; font-weight: 500; transition: all .15s; }
+  .chip:hover { border-color: var(--border-strong); }
+  .chip .count { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .chip.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-ink); }
+  .chip.on .count { color: inherit; }
+  .chip.clear { padding: 5px 12px; color: var(--muted); border-style: dashed; }
+
+  /* ----- stat cards ----- */
+  .kpis { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+  .kpi { position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow); overflow: hidden; }
+  .kpi-head { display: flex; align-items: center; gap: 8px; color: var(--text-2); font-weight: 500; font-size: 13px; }
+  .kpi-ico { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; background: var(--neutral-soft); color: var(--text-2); }
+  .kpi-ico svg { width: 15px; height: 15px; }
+  .kpi .value { font-size: 26px; font-weight: 700; letter-spacing: -.02em; margin-top: 10px; font-variant-numeric: tabular-nums; line-height: 1.2; }
+  .kpi .value .more { display: block; font-size: 15px; font-weight: 600; color: var(--text-2); letter-spacing: 0; margin-top: 2px; }
+  .kpi .foot { color: var(--muted); font-size: 12px; margin-top: 6px; }
+  .kpi.hero { background: linear-gradient(135deg, var(--accent), var(--accent-2)); border-color: transparent; color: #fff; }
+  .kpi.hero .kpi-head, .kpi.hero .foot, .kpi.hero .value .more { color: rgba(255, 255, 255, .82); }
+  .kpi.hero .kpi-ico { background: rgba(255, 255, 255, .18); color: #fff; }
+  .kpi.hero::after { content: ""; position: absolute; right: -40px; top: -40px; width: 160px; height: 160px; border-radius: 50%; background: rgba(255, 255, 255, .08); }
+  .kpi.refunds .kpi-ico { background: var(--refund-soft); color: var(--refund); }
+  .kpi.gross .kpi-ico { background: var(--accent-soft); color: var(--accent-ink); }
+  .kpi.count .kpi-ico { background: var(--ok-soft); color: var(--ok); }
+
+  /* ----- chart ----- */
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+  .chart-panel { padding: 16px 18px 12px; margin-bottom: 14px; }
+  .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .panel-title { font-weight: 600; font-size: 15px; }
+  .legend { display: flex; gap: 14px; color: var(--text-2); font-size: 12px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { width: 10px; height: 10px; border-radius: 3px; }
+  .cur-tabs { display: inline-flex; gap: 4px; }
+  .cur-tabs button { border: 1px solid var(--border); background: none; border-radius: 7px; padding: 2px 8px; font-size: 12px; font-weight: 600; color: var(--text-2); cursor: pointer; }
+  .cur-tabs button[aria-pressed="true"] { background: var(--text); color: var(--surface); border-color: var(--text); }
+  .chart { position: relative; height: 200px; margin-top: 10px; }
+  .chart svg { width: 100%; height: 100%; display: block; overflow: visible; }
+  .chart .grid line { stroke: var(--border); }
+  .chart .axis text { fill: var(--muted); font-size: 11px; }
+  .chart .zero { stroke: var(--border-strong); }
+  .chart .hit { fill: transparent; cursor: default; }
+  .chart .hit:hover { fill: var(--neutral-soft); fill-opacity: .6; }
+  .tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-lg); border-radius: 10px; padding: 8px 10px; font-size: 12px; min-width: 150px; transform: translate(-50%, 0); z-index: 2; }
+  .tip b { display: block; margin-bottom: 4px; font-size: 12px; }
+  .tip div { display: flex; justify-content: space-between; gap: 12px; color: var(--text-2); }
+  .tip div span:last-child { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .chart-empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); }
+
+  /* ----- table ----- */
+  .table-panel { overflow: hidden; }
+  .table-head { padding: 14px 18px; border-bottom: 1px solid var(--border); }
+  .table-head .count { color: var(--muted); font-weight: 500; font-size: 13px; margin-left: 6px; }
   .table-scroll { overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; }
-  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border); white-space: nowrap; }
-  th { font-size: 12px; color: var(--muted); font-weight: 600; background: var(--surface); position: sticky; top: 0; }
+  th, td { text-align: left; padding: 12px 18px; white-space: nowrap; }
+  thead th { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; background: var(--surface-2); border-bottom: 1px solid var(--border); }
+  td { border-bottom: 1px solid var(--border); }
   td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
-  tr:last-child td { border-bottom: 0; }
-  tbody tr:hover { background: var(--bg); }
-  a { color: var(--accent); text-decoration: none; } a:hover { text-decoration: underline; }
-  .c-qty-inline { display: none; color: var(--muted); font-weight: 400; }
-  @media (max-width: 640px) { .c-qty-inline { display: inline; } }
-  .tag { font-size: 12px; padding: 1px 8px; border-radius: 6px; background: var(--bg); border: 1px solid var(--border); }
-  .status-paid { color: var(--ok); } .status-unpaid { color: var(--warn); }
-  .empty, .error { padding: 32px; text-align: center; color: var(--muted); }
-  .error { color: var(--err); }
-  .meta { color: var(--muted); font-size: 12px; margin-top: 10px; }
-  dialog { border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text); width: min(560px, calc(100vw - 32px)); padding: 0; }
-  dialog::backdrop { background: rgba(0,0,0,.35); }
-  .dlg-head, .dlg-foot { padding: 14px 18px; display: flex; gap: 8px; align-items: center; justify-content: space-between; }
-  .dlg-head { border-bottom: 1px solid var(--border); } .dlg-foot { border-top: 1px solid var(--border); justify-content: flex-end; }
-  .dlg-body { max-height: 55vh; overflow: auto; padding: 8px 18px; }
-  .dlg-body label { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); cursor: pointer; }
-  .dlg-body code { color: var(--muted); font-size: 12px; margin-left: auto; }
+  tr.group td { background: var(--surface-2); color: var(--text-2); font-size: 12px; font-weight: 600; padding: 8px 18px; }
+  tr.group td span { color: var(--muted); font-weight: 500; margin-left: 6px; }
+  tbody tr.txn { transition: background .12s; }
+  tbody tr.txn:hover { background: var(--surface-2); }
+  tbody tr:last-child td { border-bottom: 0; }
+  .prod { display: flex; align-items: center; gap: 10px; font-weight: 600; }
+  .avatar { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; font-size: 12px; font-weight: 700; background: var(--accent-soft); color: var(--accent-ink); flex: none; }
+  .avatar.refund { background: var(--refund-soft); color: var(--refund); }
+  .avatar.failed { background: var(--neutral-soft); color: var(--muted); }
+  .avatar svg { width: 15px; height: 15px; }
+  .qty { color: var(--muted); font-weight: 500; }
+  .cust { color: var(--text-2); }
+  .time { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .amount { font-weight: 650; font-size: 14.5px; }
+  .amount.neg { color: var(--refund); }
+  .refund-note { display: block; color: var(--refund); font-size: 11.5px; font-weight: 500; }
+  .src { color: var(--text-2); font-size: 13px; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 3px 9px 3px 8px; border-radius: 99px; text-transform: capitalize; }
+  .pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .pill.paid { background: var(--ok-soft); color: var(--ok); }
+  .pill.unpaid, .pill.partially-refunded { background: var(--warn-soft); color: var(--warn); }
+  .pill.refunded, .pill.refund, .pill.failed { background: var(--err-soft); color: var(--err); }
+  .pill.canceled { background: var(--neutral-soft); color: var(--muted); }
+  tr.unpaid .prod, tr.unpaid .amount, tr.unpaid .cust { opacity: .55; }
+  tr.unpaid .amount { text-decoration: line-through; }
+  .open { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; color: var(--muted); }
+  .open:hover { background: var(--neutral-soft); color: var(--accent-ink); }
+
+  .state { padding: 48px 20px; text-align: center; color: var(--muted); }
+  .state svg { width: 28px; height: 28px; margin-bottom: 8px; color: var(--border-strong); }
+  .state.error { color: var(--err); }
+  .skel { display: block; height: 12px; border-radius: 6px; background: linear-gradient(90deg, var(--neutral-soft), var(--surface-2), var(--neutral-soft)); background-size: 200% 100%; animation: shimmer 1.2s infinite; }
+  @keyframes shimmer { to { background-position: -200% 0; } }
+
+  /* ----- product picker ----- */
+  dialog { border: 1px solid var(--border); border-radius: 16px; background: var(--surface); color: var(--text); width: min(520px, calc(100vw - 32px)); padding: 0; box-shadow: var(--shadow-lg); }
+  dialog::backdrop { background: rgba(10, 12, 20, .45); backdrop-filter: blur(2px); }
+  .dlg-head { padding: 18px 20px 12px; }
+  .dlg-head h2 { margin: 0; font-size: 17px; }
+  .dlg-head p { margin: 2px 0 12px; color: var(--muted); }
+  .dlg-head .field input { width: 100%; }
+  .dlg-body { max-height: 52vh; overflow: auto; padding: 4px 12px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+  .dlg-body label { display: flex; gap: 12px; align-items: center; padding: 10px 8px; border-radius: 10px; cursor: pointer; }
+  .dlg-body label:hover { background: var(--surface-2); }
+  .dlg-body input[type=checkbox] { width: 17px; height: 17px; accent-color: var(--accent); }
+  .dlg-body code { color: var(--muted); font-size: 11.5px; margin-left: auto; }
+  .dlg-foot { padding: 14px 20px; display: flex; gap: 10px; justify-content: flex-end; }
+
+  .kpi.fees .kpi-ico { background: var(--warn-soft); color: var(--warn); }
+  .kpis.home { grid-template-columns: 1.5fr 1.1fr 1fr 1fr; }
+  .kpi.feesbig { background: var(--surface); border: 1px solid var(--border); }
+  .kpi.feesbig .kpi-ico { background: var(--warn-soft); color: var(--warn); }
+  .kpi .alltime { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 12.5px; color: var(--text-2); display: flex; justify-content: space-between; gap: 8px; }
+  .kpi .alltime b { font-variant-numeric: tabular-nums; color: var(--text); }
+  .kpi.hero .alltime { border-top-color: rgba(255, 255, 255, .25); color: rgba(255, 255, 255, .85); }
+  .kpi.hero .alltime b { color: #fff; }
+  .approx { opacity: .7; font-weight: 600; margin-right: 2px; }
+  .fx-note { color: var(--muted); font-size: 12px; margin: -4px 0 14px; display: flex; align-items: flex-start; gap: 6px; }
+  .fx-note svg { margin-top: 1px; }
+  tbody tr.txn[data-pi] { cursor: pointer; }
+  .net-line { display: block; color: var(--muted); font-size: 11.5px; font-weight: 500; }
+
+  /* ----- payouts ----- */
+  .payouts-panel { padding: 16px 18px 6px; margin-bottom: 14px; }
+  .po-cards { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 12px; margin: 14px 0; }
+  .po-card { border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; background: var(--surface); }
+  .po-card.next { border-color: var(--accent); background: linear-gradient(180deg, var(--accent-soft), var(--surface) 70%); }
+  .po-card .l { color: var(--text-2); font-size: 12.5px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+  .po-card .date { font-size: 13px; color: var(--text-2); margin-top: 2px; }
+  .po-card .date b { color: var(--text); }
+  .po-card .v { font-size: 24px; font-weight: 700; letter-spacing: -.02em; margin: 6px 0 4px; font-variant-numeric: tabular-nums; }
+  .po-card .s { color: var(--muted); font-size: 12.5px; line-height: 1.6; }
+  .po-card .s b { color: var(--text-2); font-weight: 600; }
+  .po-bar { display: flex; height: 6px; border-radius: 99px; overflow: hidden; background: var(--neutral-soft); margin: 8px 0 6px; gap: 2px; }
+  .po-bar i { display: block; height: 100%; }
+  .po-table { margin: 0 -18px; }
+  .po-table th, .po-table td { padding: 10px 18px; }
+  .po-row { cursor: pointer; }
+  .po-row:hover { background: var(--surface-2); }
+  .po-row td:first-child::before { content: "›"; display: inline-block; width: 14px; color: var(--muted); transition: transform .15s; }
+  .po-row.expanded td:first-child::before { transform: rotate(90deg); }
+  .po-items td { background: var(--surface-2); padding: 0 18px 10px 50px !important; }
+  .po-items .it { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px dashed var(--border); font-size: 13px; color: var(--text-2); }
+  .po-items .it:last-child { border-bottom: 0; }
+  .bank { display: inline-flex; align-items: center; gap: 6px; color: var(--text-2); font-size: 13px; }
+  .po-pill { font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 99px; text-transform: capitalize; }
+  .po-pill.paid { background: var(--ok-soft); color: var(--ok); }
+  .po-pill.in_transit, .po-pill.pending { background: var(--accent-soft); color: var(--accent-ink); }
+  .po-pill.failed, .po-pill.canceled { background: var(--err-soft); color: var(--err); }
+  .po-tag { display: block; font-size: 11px; color: var(--muted); font-weight: 500; }
+  .po-tag.paid { color: var(--ok); }
+
+  /* ----- report ----- */
+  .report-panel { padding: 16px 18px 6px; margin-bottom: 14px; }
+  .report-sum { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin: 14px 0 12px; }
+  .report-sum > div { background: var(--surface); padding: 12px 14px; }
+  .report-sum .l { color: var(--muted); font-size: 12px; }
+  .report-sum .v { font-weight: 700; font-size: 17px; font-variant-numeric: tabular-nums; margin-top: 2px; }
+  .report-sum .v.neg { color: var(--refund); }
+  .report-sum .v.net { color: var(--ok); }
+  .report-note { color: var(--muted); font-size: 12.5px; margin: 0 0 10px; display: flex; gap: 6px; align-items: flex-start; }
+  .report-note svg { margin-top: 2px; }
+  .report-note b { color: var(--text-2); font-weight: 600; }
+  .report-table { margin: 0 -18px; }
+  .report-table th, .report-table td { padding: 10px 18px; }
+  .report-table tfoot td { font-weight: 700; background: var(--surface-2); border-bottom: 0; }
+  .btn-ghost { height: 34px; padding: 0 12px; display: inline-flex; align-items: center; gap: 7px; border-radius: 9px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-weight: 600; cursor: pointer; }
+  .btn-ghost:hover { border-color: var(--border-strong); }
+
+  /* ----- payment detail drawer ----- */
+  dialog.drawer { margin: 0 0 0 auto; height: 100vh; max-height: 100vh; width: min(1040px, 100vw); max-width: 100vw; border-radius: 18px 0 0 18px; border-right: 0; display: none; flex-direction: column; }
+  dialog.drawer[open] { display: flex; animation: slidein .22s ease-out; }
+  @keyframes slidein { from { transform: translateX(40px); opacity: 0; } }
+  .dw-top { display: flex; align-items: center; gap: 10px; padding: 14px 22px; border-bottom: 1px solid var(--border); }
+  .dw-top .crumb { color: var(--accent-ink); font-weight: 600; font-size: 13px; }
+  .dw-body { overflow: auto; padding: 22px 26px 40px; flex: 1; }
+  .dw-hero { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; align-items: flex-start; margin-bottom: 24px; }
+  .dw-amount { font-size: 30px; font-weight: 700; letter-spacing: -.02em; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .dw-amount .cur { color: var(--muted); font-weight: 600; font-size: 24px; }
+  .dw-sub { color: var(--text-2); margin-top: 4px; }
+  .dw-sub a { font-weight: 600; }
+  .dw-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .dw-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 36px; }
+  .dw-sec { margin-bottom: 30px; }
+  .dw-sec h3 { font-size: 17px; margin: 0 0 12px; letter-spacing: -.01em; }
+  .dw-sec .hint { color: var(--muted); margin: -6px 0 12px; font-size: 13px; }
+  .tl { list-style: none; margin: 0; padding: 0; }
+  .tl li { position: relative; display: flex; justify-content: space-between; gap: 12px; padding: 0 0 18px 26px; }
+  .tl li::before { content: ""; position: absolute; left: 5px; top: 18px; bottom: -2px; width: 1.5px; background: var(--border); }
+  .tl li:last-child::before { display: none; }
+  .tl .dot { position: absolute; left: 0; top: 4px; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--border-strong); background: var(--surface); }
+  .tl .dot.good { border-color: var(--ok); background: var(--ok); box-shadow: 0 0 0 3px var(--ok-soft); }
+  .tl .dot.bad { border-color: var(--err); background: var(--err); box-shadow: 0 0 0 3px var(--err-soft); }
+  .tl .dot.future { border-style: dashed; }
+  .tl .t { font-weight: 600; }
+  .tl .d { color: var(--muted); font-size: 12.5px; text-transform: capitalize; }
+  .tl time { color: var(--text-2); font-size: 13px; white-space: nowrap; text-decoration: underline dotted var(--border-strong); text-underline-offset: 3px; }
+  .kv { display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 8px 16px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .kv:first-of-type { border-top: 1px solid var(--border); }
+  .kv .k { font-weight: 600; }
+  .kv .v { color: var(--text-2); overflow-wrap: anywhere; }
+  .items { width: 100%; border-collapse: collapse; margin-top: 4px; }
+  .items th { text-align: left; font-size: 12px; color: var(--text-2); font-weight: 500; text-transform: none; letter-spacing: 0; background: none; padding: 10px 4px; border-bottom: 1px solid var(--border); }
+  .items td { padding: 12px 4px; white-space: normal; }
+  .items .r { text-align: right; font-variant-numeric: tabular-nums; }
+  .items tfoot td { border-bottom: 0; padding: 6px 4px; }
+  .items tfoot tr.total td { font-weight: 700; border-top: 1px solid var(--border); padding-top: 12px; }
+  .items .period { display: block; color: var(--muted); font-size: 12px; }
+  .bd { border-top: 1px solid var(--border); }
+  .bd-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 13px 4px; border-bottom: 1px solid var(--border); }
+  .bd-row .k { font-weight: 600; }
+  .bd-row .k small { color: var(--muted); font-weight: 400; margin-left: 6px; font-size: 12px; }
+  .bd-row .v { font-variant-numeric: tabular-nums; font-weight: 600; text-align: right; }
+  .bd-row .v .from { color: var(--muted); font-weight: 500; margin-right: 6px; }
+  .bd-row.total { font-size: 15.5px; }
+  .bd-row.total .v { font-weight: 700; }
+  .bd-row.good .v { color: var(--ok); } .bd-row.bad .v { color: var(--refund); }
+  details.fees > summary { list-style: none; cursor: pointer; }
+  details.fees > summary::-webkit-details-marker { display: none; }
+  details.fees > summary .k::before { content: "›"; display: inline-block; margin-right: 8px; transition: transform .15s; color: var(--muted); }
+  details.fees[open] > summary .k::before { transform: rotate(90deg); }
+  .fee-row { display: flex; justify-content: space-between; padding: 8px 4px 8px 24px; color: var(--text-2); font-size: 13px; border-bottom: 1px dashed var(--border); font-variant-numeric: tabular-nums; }
+  .callout { display: flex; gap: 10px; padding: 10px 12px; border-radius: 10px; font-size: 13px; margin-top: 12px; background: var(--neutral-soft); color: var(--text-2); }
+  .callout.bad { background: var(--err-soft); color: var(--err); }
+  .callout svg { margin-top: 2px; }
+  .side h4 { font-size: 16px; margin: 0 0 14px; display: flex; align-items: center; gap: 8px; }
+  .side .f { margin-bottom: 16px; }
+  .side .f .k { font-weight: 600; margin-bottom: 3px; }
+  .side .f .v { color: var(--text-2); overflow-wrap: anywhere; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .side .block { padding-bottom: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+  .copy { border: 0; background: none; color: var(--muted); cursor: pointer; padding: 2px; border-radius: 5px; display: inline-grid; }
+  .copy:hover { color: var(--accent-ink); background: var(--accent-soft); }
+  .copy svg { width: 14px; height: 14px; }
+  .tag-soft { font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 6px; background: var(--neutral-soft); color: var(--text-2); }
+  .risk { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 6px; text-transform: capitalize; }
+  .risk.normal { background: var(--ok-soft); color: var(--ok); } .risk.elevated { background: var(--warn-soft); color: var(--warn); } .risk.highest { background: var(--err-soft); color: var(--err); }
+  .brand-badge { font-size: 10.5px; font-weight: 800; letter-spacing: .03em; padding: 2px 6px; border-radius: 5px; background: var(--text); color: var(--surface); text-transform: uppercase; }
+  .pm-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; }
+  .pm-grid .kv { grid-template-columns: 120px minmax(0, 1fr); }
+  .dw-loading { display: grid; gap: 14px; }
+
+  /* ----- tablet ----- */
+  @media (max-width: 960px) {
+    .kpis { grid-template-columns: 1fr 1fr; }
+    .dw-grid { grid-template-columns: 1fr; gap: 8px; }
+    .report-sum { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .po-cards { grid-template-columns: 1fr 1fr; }
+    .po-card.next { grid-column: 1 / -1; }
+  }
 
   /* ----- phones ----- */
   @media (max-width: 640px) {
-    .wrap { padding: 16px 16px 40px; }
-    header { flex-direction: column; align-items: stretch; }
-    h1 { font-size: 18px; }
-    .controls { display: grid; grid-template-columns: 1fr 1fr; }
-    .controls input[type=search] { grid-column: 1 / -1; order: -1; }
-    #days, .logout { grid-column: 1 / -1; }
-    select, input[type=search], button { padding: 10px 12px; font-size: 16px; } /* 16px stops iOS zoom */
+    .appbar-in { padding: 10px 16px; gap: 8px; }
+    .brand { white-space: nowrap; font-size: 14px; gap: 8px; }
+    .updated, .icon-btn .lbl, .who { display: none !important; }
+    .wrap { padding: 18px 16px 40px; }
+    h1 { font-size: 21px; }
+    .page-head .btn-primary { width: 100%; justify-content: center; }
+    .toolbar { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .toolbar > * { min-width: 0; }
+    .field select, .field input { width: 100%; font-size: 16px; } /* 16px stops iOS zoom */
+    .field.search { grid-column: 1 / -1; order: -1; }
+    .seg { grid-column: 1 / -1; overflow-x: auto; scrollbar-width: none; }
+    .seg button { flex: 1; padding: 7px 8px; }
     .chips { flex-wrap: nowrap; overflow-x: auto; margin: 0 -16px 16px; padding: 0 16px; scrollbar-width: none; }
-    .chip { white-space: nowrap; padding: 7px 14px; }
-    .kpis { grid-template-columns: repeat(3, 1fr); gap: 8px; }
-    .kpi { padding: 12px; }
-    .kpi .value { font-size: 18px; overflow-wrap: anywhere; }
-    .kpi:first-child { grid-column: 1 / -1; }
+    .chip { white-space: nowrap; }
+    .kpis { gap: 10px; }
+    .kpi { padding: 14px; }
+    .kpi .value { font-size: 20px; }
+    .kpi .value .more { font-size: 13px; }
+    .kpi.hero { grid-column: 1 / -1; }
+    .kpi.hero .value { font-size: 26px; }
+    .kpi.fees { grid-column: 1 / -1; }
+    .kpis.home { grid-template-columns: 1fr 1fr; }
+    .kpi.feesbig { grid-column: 1 / -1; }
+    .chart { height: 170px; }
 
     /* table -> stacked cards */
-    .card { background: none; border: 0; }
-    thead { display: none; }
-    table, tbody, tr, td { display: block; width: 100%; }
-    tbody tr { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; background: var(--surface);
-      border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; }
-    tbody tr:hover { background: var(--surface); }
-    td { padding: 0; border: 0; white-space: normal; text-align: left; }
-    td.c-product { grid-area: 1 / 1; font-weight: 600; }
-    td.c-amount { grid-area: 1 / 2; font-weight: 650; font-size: 15px; text-align: right; }
-    td.c-customer { grid-area: 2 / 1; }
-    td.c-status { grid-area: 2 / 2; text-align: right; font-size: 13px; }
-    td.c-date { grid-area: 3 / 1 / 4 / 3; }
-    td.c-customer, td.c-date { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
-    td.c-qty { display: none; }
-    td.c-type { grid-area: 4 / 1; margin-top: 8px; }
-    td.c-link { grid-area: 4 / 2; text-align: right; margin-top: 8px; align-self: center; }
-    td.c-link a { display: inline-block; padding: 4px 0; }
-    .empty, .error { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px 16px; }
-    dialog { max-height: calc(100vh - 32px); }
-    .dlg-head { flex-wrap: wrap; } .dlg-head input { flex: 1; min-width: 0; font-size: 16px; }
+    .table-panel { background: none; border: 0; box-shadow: none; }
+    .table-head { padding: 0 2px 10px; border: 0; }
+    .table-panel thead, .report-table thead { display: none; }
+    .table-panel table, .table-panel tbody, .table-panel tr, .table-panel td,
+    .report-table table, .report-table tbody, .report-table tfoot { display: block; width: 100%; }
+    tr.group td { background: none; border: 0; padding: 14px 2px 6px; }
+    tbody tr.txn { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; margin-bottom: 8px; box-shadow: var(--shadow); }
+    .table-panel td { padding: 0; border: 0; white-space: normal; }
+    td.c-product { grid-area: 1 / 1; }
+    td.c-amount { grid-area: 1 / 2; text-align: right; }
+    td.c-customer { grid-area: 2 / 1; font-size: 13px; overflow-wrap: anywhere; padding-left: 40px; }
+    td.c-status { grid-area: 2 / 2; text-align: right; }
+    td.c-meta { grid-area: 3 / 1; font-size: 12.5px; padding-left: 40px; }
+    td.c-time { display: none; }
+    td.c-link { grid-area: 3 / 2; text-align: right; }
+    td.c-meta .time-inline { display: inline; }
+    .open { width: auto; height: auto; padding: 2px 0; }
+    .state { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; }
     .dlg-body code { display: none; }
-    .dlg-body label { padding: 12px 0; }
-    .dlg-foot button { flex: 1; }
+    .dlg-foot > * { flex: 1; justify-content: center; }
+    dialog.drawer { width: 100vw; border-radius: 0; border: 0; }
+    .dw-top { padding: 10px 12px; gap: 8px; }
+    .dw-top .crumb { display: none; }
+    .dw-actions { flex-wrap: nowrap; }
+    .dw-actions .btn-ghost { padding: 0 10px; font-size: 13px; white-space: nowrap; }
+    .items th, .items td { font-size: 13px; }
+    .dw-body { padding: 18px 16px 40px; }
+    .dw-amount { font-size: 26px; }
+    .kv, .pm-grid .kv { grid-template-columns: 110px minmax(0, 1fr); }
+    .pm-grid { grid-template-columns: 1fr; }
+    .report-table { margin: 0; }
+    .report-table thead { display: none; }
+    .report-table tr { display: grid !important; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 10px 2px; border-bottom: 1px solid var(--border); background: none !important; box-shadow: none !important; border-radius: 0 !important; margin: 0 !important; border-left: 0 !important; border-right: 0 !important; border-top: 0 !important; }
+    .report-table td { padding: 0 !important; border: 0 !important; font-size: 13px; white-space: normal; }
+    .report-table td.rp-name { font-weight: 600; font-size: 14px; }
+    .report-table td.rp-net { text-align: right; font-weight: 700; }
+    .report-table td.rp-meta { grid-column: 1 / -1; color: var(--muted); }
+    .report-table td.rp-col { display: none !important; }
+    .report-panel { padding: 14px 14px 4px; }
+    .payouts-panel { padding: 14px 14px 4px; }
+    .po-cards { grid-template-columns: 1fr; }
+    .po-table { margin: 0; }
+    .po-table thead { display: none; }
+    .po-table table, .po-table tbody { display: block; }
+    .po-table tr.po-row { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 10px 2px; border-bottom: 1px solid var(--border); }
+    .po-table tr.po-row td { padding: 0; border: 0; white-space: normal; font-size: 13px; }
+    .po-table td.pc-hide { display: none; }
+    .po-table tr.po-items { display: block; }
+    .po-table tr.po-items td { display: block; padding: 6px 4px 10px 16px !important; }
+  }
+  .time-inline { display: none; color: var(--muted); }
+  .page-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  #mmDialog { width: min(980px, calc(100vw - 24px)); max-width: 980px; padding: 0; }
+  #mmDialog[open] { display: flex; flex-direction: column; max-height: 90vh; }
+  #mmDialog .dlg-head, #mmDialog .dlg-foot { flex-shrink: 0; }
+  #mmOpen[hidden] { display: none; }
+  #mmDialog .dlg-head p { max-width: 75ch; }
+  .mm-body { padding: 0 24px 20px; overflow: auto; min-height: 0; }
+  .mm-body h3 { font-size: 15px; margin: 22px 0 8px; }
+  .mm-mappings { display: grid; gap: 10px; margin: 14px 0; }
+  .mm-mappings label { display: grid; grid-template-columns: minmax(160px, 1fr) minmax(200px, 1fr); gap: 12px; align-items: center; }
+  .mm-mappings select { padding: 9px; min-width: 0; max-width: 100%; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface); }
+  #mmMessage { margin: 0 24px 16px; padding: 12px; border-radius: 8px; background: var(--neutral-soft); white-space: pre-wrap; }
+  #mmMessage.error { color: var(--err); background: var(--err-soft); }
+  #mmMessage.success { color: var(--ok); background: var(--ok-soft); }
+  .mm-entry { border: 1px solid var(--border); border-radius: 10px; margin: 8px 0; overflow: hidden; }
+  .mm-entry summary { cursor: pointer; padding: 12px; overflow-wrap: anywhere; }
+  .mm-entry table { table-layout: fixed; }
+  .mm-entry td, .mm-entry th { white-space: normal; padding: 10px 12px; overflow-wrap: anywhere; }
+  .mm-entry th:first-child { width: 54%; }
+  .mm-source { display: block; margin: 6px 12px; color: var(--muted); overflow-wrap: anywhere; }
+  .mm-issues { padding-left: 20px; color: var(--warn); overflow-wrap: anywhere; }
+  #mmDialog .dlg-foot { flex-wrap: wrap; }
+  #mmDialog button:disabled { opacity: .5; cursor: default; }
+  #mmDialog :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  @media (max-width: 600px) {
+    .mm-body { padding: 0 14px 16px; }
+    .mm-mappings label { grid-template-columns: 1fr; gap: 4px; }
+    #mmDialog .report-sum { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    #mmDialog .dlg-foot { display: grid; grid-template-columns: minmax(70px, 1fr) minmax(0, 2fr); padding: 12px 14px; gap: 8px; }
+    #mmDialog .dlg-foot .spacer { display: none; }
+    #mmDialog .dlg-foot button { min-height: 42px; height: auto; padding: 10px 12px; line-height: 1.3; justify-content: center; }
+    #mmPreviewButton { grid-column: 1 / -1; grid-row: 1; }
+    #mmClose, #mmSync { grid-row: 2; }
   }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <h1>Product Transactions <span id="mode" class="badge" hidden></span></h1>
-    <div class="controls">
-      <select id="days" aria-label="Date range">
-        <option value="1">Last 24 hours</option>
-        <option value="7">Last 7 days</option>
-        <option value="30" selected>Last 30 days</option>
-        <option value="90">Last 90 days</option>
-        <option value="365">Last 12 months</option>
-      </select>
-      <input id="q" type="search" placeholder="Search customer…" aria-label="Search customer">
-      <button id="refresh">Refresh</button>
-      <button id="manage" class="primary">Choose products</button>
-      <form method="post" action="/logout" class="logout"><button type="submit">Sign out</button></form>
+<header class="appbar">
+  <div class="appbar-in">
+    <div class="brand">
+      <span class="logo"><svg class="i" viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></span>
+      Stripe Transactions
     </div>
-  </header>
+    <span id="mode" class="mode" hidden></span>
+    <span class="spacer"></span>
+    <span id="updated" class="updated"></span>
+    <span id="who" class="who" hidden></span>
+    <button id="refresh" class="icon-btn" title="Refresh" aria-label="Refresh">
+      <svg class="i" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 4v5h-5"/></svg><span class="lbl">Refresh</span>
+    </button>
+    <form method="post" action="/logout" class="logout">
+      <button type="submit" class="icon-btn" title="Sign out" aria-label="Sign out">
+        <svg class="i" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg><span class="lbl">Sign out</span>
+      </button>
+    </form>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="page-head">
+    <div>
+      <h1>Transactions</h1>
+      <p class="sub" id="sub">Payments, top-ups and refunds across your Stripe account.</p>
+    </div>
+    <div class="page-actions">
+    <button id="mmOpen" class="icon-btn" hidden>Sync with Money Master</button>
+    <button id="manage" class="btn-primary">
+      <svg class="i" viewBox="0 0 24 24"><path d="M12 3 2 8l10 5 10-5-10-5Z"/><path d="m2 16 10 5 10-5"/><path d="m2 12 10 5 10-5"/></svg>
+      Tracked products
+    </button>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <label class="field">
+      <svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+      <select id="days" aria-label="Date range">
+        <option value="today">Today</option>
+        <option value="week">This week</option>
+        <option value="month" selected>This month</option>
+        <option value="last_month">Last month</option>
+        <option value="year">This year</option>
+        <optgroup label="By month" id="months"></optgroup>
+        <option value="all">All time</option>
+      </select>
+      <svg class="i chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+    </label>
+    <label class="field">
+      <svg class="i" viewBox="0 0 24 24"><path d="M3 6h18M7 12h10M10 18h4"/></svg>
+      <select id="view" aria-label="Which products">
+        <option value="all">All products</option>
+        <option value="tracked">Tracked products</option>
+      </select>
+      <svg class="i chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+    </label>
+    <label class="field" title="Currency used for totals, the chart and the report">
+      <svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15 9.5c-.5-1-1.6-1.5-3-1.5-1.7 0-3 .9-3 2s1.3 1.7 3 2 3 .9 3 2-1.3 2-3 2c-1.4 0-2.5-.5-3-1.5M12 6v2M12 16v2"/></svg>
+      <select id="cur" aria-label="Show amounts in"></select>
+      <svg class="i chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+    </label>
+    <div class="seg" id="kind" role="group" aria-label="Transaction type">
+      <button data-v="all" aria-pressed="true">All</button>
+      <button data-v="payment" aria-pressed="false">Payments</button>
+      <button data-v="refund" aria-pressed="false">Refunds</button>
+      <button data-v="failed" aria-pressed="false">Failed</button>
+    </div>
+    <label class="field search">
+      <svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="q" type="search" placeholder="Search customer or product…" aria-label="Search customer or product">
+    </label>
+  </div>
 
   <div id="chips" class="chips"></div>
-  <div id="kpis" class="kpis"></div>
-  <div class="card">
+
+  <section id="kpis" class="kpis home" aria-label="Totals"></section>
+  <p id="fxNote" class="fx-note" hidden></p>
+
+  <section class="panel payouts-panel" aria-labelledby="payouts-title">
+    <div class="panel-head">
+      <div>
+        <div class="panel-title" id="payouts-title">Payouts to your bank</div>
+        <div class="sub" id="poSub" style="font-size:12.5px"></div>
+      </div>
+    </div>
+    <div id="poCards" class="po-cards"></div>
+    <div class="table-scroll po-table">
+      <table>
+        <thead><tr><th>Arrived</th><th>Status</th><th class="num">Payments</th><th class="num">Gross</th><th class="num">Fees</th><th class="num">Refunds</th><th class="num">Paid out</th></tr></thead>
+        <tbody id="poRows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel chart-panel" aria-labelledby="chart-title">
+    <div class="panel-head">
+      <div class="panel-title" id="chart-title">Revenue over time</div>
+      <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+        <div class="legend"><span><i style="background:var(--accent)"></i>Payments</span><span><i style="background:var(--refund)"></i>Refunds</span></div>
+        <div id="curTabs" class="cur-tabs"></div>
+      </div>
+    </div>
+    <div id="chart" class="chart"></div>
+  </section>
+
+  <section class="panel report-panel" aria-labelledby="report-title">
+    <div class="panel-head">
+      <div>
+        <div class="panel-title" id="report-title">Earnings report</div>
+        <div class="sub" id="reportSub" style="font-size:12.5px"></div>
+      </div>
+      <button id="csv" class="btn-ghost" title="Download every transaction in this view as a spreadsheet">
+        <svg class="i" viewBox="0 0 24 24"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>Download CSV
+      </button>
+    </div>
+    <div id="reportSum" class="report-sum"></div>
+    <p id="reportNote" class="report-note"></p>
+    <div class="table-scroll report-table">
+      <table>
+        <thead><tr><th>Product</th><th class="num">Payments</th><th class="num">Gross</th><th class="num">Stripe fees</th><th class="num">Refunds</th><th class="num">You receive</th></tr></thead>
+        <tbody id="reportRows"></tbody>
+        <tfoot id="reportFoot"></tfoot>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel table-panel">
+    <div class="table-head panel-title">Activity<span id="count" class="count"></span></div>
     <div class="table-scroll">
       <table>
-        <thead><tr><th>Date</th><th>Product</th><th>Customer</th><th class="num">Qty</th><th class="num">Amount</th><th>Type</th><th>Status</th><th></th></tr></thead>
+        <thead><tr><th>Product</th><th>Customer</th><th>Type</th><th>Time</th><th>Status</th><th class="num">Amount</th><th></th></tr></thead>
         <tbody id="rows"></tbody>
       </table>
     </div>
-    <div id="state" class="empty">Loading…</div>
+    <div id="state" class="state"></div>
+  </section>
+</main>
+
+<dialog id="detail" class="drawer" aria-label="Payment details">
+  <div class="dw-top">
+    <button id="dwClose" class="icon-btn" aria-label="Close"><svg class="i" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    <span class="crumb">Transactions</span>
+    <span class="spacer"></span>
+    <div id="dwActions" class="dw-actions"></div>
   </div>
-  <div id="meta" class="meta"></div>
-</div>
+  <div id="dwBody" class="dw-body"></div>
+</dialog>
 
 <dialog id="dlg">
-  <div class="dlg-head"><strong>Products to track</strong><input id="dlgq" type="search" placeholder="Filter…"></div>
+  <div class="dlg-head">
+    <h2>Tracked products</h2>
+    <p>Pick the products shown in the “Tracked products” view.</p>
+    <label class="field">
+      <svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="dlgq" type="search" placeholder="Filter products…">
+    </label>
+  </div>
   <div id="dlgbody" class="dlg-body"></div>
-  <div class="dlg-foot"><button id="dlgcancel">Cancel</button><button id="dlgsave" class="primary">Save</button></div>
+  <div class="dlg-foot"><button id="dlgcancel" class="icon-btn">Cancel</button><button id="dlgsave" class="btn-primary">Save</button></div>
+</dialog>
+
+<dialog id="mmDialog" aria-labelledby="mmTitle" aria-describedby="mmDescription">
+  <div class="dlg-head">
+    <h2 id="mmTitle">Sync with Money Master</h2>
+    <p id="mmDescription">Sentink → login center 12. Sentink Plus is excluded. This sync includes all history, regardless of dashboard filters.</p>
+  </div>
+  <p id="mmMessage" role="status" aria-live="polite" hidden></p>
+  <div class="mm-body">
+    <p id="mmPolicy" class="report-note">Subscription invoices debit the plan receivable and credit income. The payout debits Wio Bank and credits that receivable. Other payments debit Stripe receivables and credit income. Refunds reverse the original income. Imported entries stay Pending.</p>
+    <h3>Product income ledgers</h3>
+    <p class="report-note">Review the suggested ledgers. Starter, Growth and Pro use the matching receivable until the payout reaches the bank. Saving and previewing confirms these assignments.</p>
+    <div id="mmMappings" class="mm-mappings"></div>
+    <div id="mmPreview"></div>
+  </div>
+  <div class="dlg-foot">
+    <button id="mmClose" class="icon-btn">Close</button>
+    <span class="spacer"></span>
+    <button id="mmPreviewButton" class="icon-btn" disabled>Save mappings &amp; preview</button>
+    <button id="mmSync" class="btn-primary" disabled>Sync ready entries</button>
+  </div>
 </dialog>
 
 <script>
 const $ = (id) => document.getElementById(id);
 let data = null;
-let active = new Set();          // product ids currently shown (empty = all tracked)
-let timer;
+let active = new Set();   // product names picked in the chips (empty = all)
+let kind = 'all';
+let chartCur = null;      // currency shown in the chart
+let shown = [];           // rows currently listed (used by the CSV export)
+let allTime = null;       // all-time rows for the "All time" totals
+let payouts = null;       // from /api/payouts
+const openPayouts = new Set();
+const DISPLAY_CURS = ['aed', 'usd', 'eur', 'gbp', 'sek', 'sar', 'qar', 'egp', 'inr', 'cad', 'aud', 'chf', 'try'];
+let displayCur = null;    // chosen in "Show in"; defaults to the payout currency
+
+const store = {
+  get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
+  set: (k, v) => { try { localStorage.setItem(k, v); } catch {} },
+};
+{
+  const v = store.get('view');
+  if (v && [...$('view').options].some((o) => o.value === v)) $('view').value = v;
+  displayCur = store.get('cur');
+  const k = store.get('kind');
+  if (k && document.querySelector(`#kind [data-v="${k}"]`)) kind = k;
+}
 
 const fmtMoney = (cents, cur) => new Intl.NumberFormat(undefined, { style: 'currency', currency: cur.toUpperCase() }).format(cents / 100);
-const fmtDate = (s) => new Date(s * 1000).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
-const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmtDate = (s) => new Date(s * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+const fmtDateTime = (s) => new Date(s * 1000).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+// Calendar periods in the viewer's timezone, as unix seconds [from, to).
+function periodRange(v) {
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
+  const sec = (dt) => Math.floor(dt.getTime() / 1000);
+  if (v === 'today') return { from: sec(new Date(y, m, d)), to: sec(new Date(y, m, d + 1)) };
+  if (v === 'week') { const mon = d - ((now.getDay() + 6) % 7); return { from: sec(new Date(y, m, mon)), to: sec(new Date(y, m, mon + 7)) }; }
+  if (v === 'month') return { from: sec(new Date(y, m, 1)), to: sec(new Date(y, m + 1, 1)) };
+  if (v === 'last_month') return { from: sec(new Date(y, m - 1, 1)), to: sec(new Date(y, m, 1)) };
+  if (v === 'year') return { from: sec(new Date(y, 0, 1)), to: sec(new Date(y + 1, 0, 1)) };
+  const mm = /^m:(\d{4})-(\d{2})$/.exec(v);
+  if (mm) return { from: sec(new Date(+mm[1], +mm[2] - 1, 1)), to: sec(new Date(+mm[1], +mm[2], 1)) };
+  return {}; // all time
+}
+// "By month" lists the last 12 calendar months.
+(() => {
+  const now = new Date();
+  $('months').innerHTML = Array.from({ length: 12 }, (_, i) => {
+    const dt = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const v = `m:${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
+    return `<option value="${v}">${dt.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</option>`;
+  }).join('');
+  const saved = store.get('period');
+  if (saved && [...$('days').options].some((o) => o.value === saved)) $('days').value = saved;
+})();
+const fmtShort = (s) => new Date(s * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+const fmtTime = (s) => new Date(s * 1000).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const initials = (name) => name.split(/[\s-]+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '•';
+const dayKey = (s) => { const d = new Date(s * 1000); return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; };
+
+function dayLabel(s) {
+  const d = new Date(s * 1000), today = new Date();
+  const diff = Math.round((new Date(today.getFullYear(), today.getMonth(), today.getDate()) - new Date(d.getFullYear(), d.getMonth(), d.getDate())) / 864e5);
+  if (diff === 0) return 'Today';
+  if (diff === 1) return 'Yesterday';
+  return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: d.getFullYear() === today.getFullYear() ? undefined : 'numeric' });
+}
+
+const ICON = {
+  refund: '<svg class="i" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg>',
+  failed: '<svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m15 9-6 6M9 9l6 6"/></svg>',
+  open: '<svg class="i" viewBox="0 0 24 24"><path d="M7 17 17 7M8 7h9v9"/></svg>',
+  wallet: '<svg class="i" viewBox="0 0 24 24"><path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3"/><path d="M21 9h-6a3 3 0 0 0 0 6h6Z"/></svg>',
+  up: '<svg class="i" viewBox="0 0 24 24"><path d="m3 17 6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg>',
+  users: '<svg class="i" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+  fee: '<svg class="i" viewBox="0 0 24 24"><path d="M19 5 5 19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>',
+  clock: '<svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  check: '<svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg>',
+  copy: '<svg class="i" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>',
+  info: '<svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>',
+  receipt: '<svg class="i" viewBox="0 0 24 24"><path d="M5 21V3l2 1.5L9 3l2 1.5L13 3l2 1.5L17 3l2 1.5V21l-2-1.5-2 1.5-2-1.5-2 1.5-2-1.5L7 21Z"/><path d="M9 9h6M9 13h6"/></svg>',
+  empty: '<svg class="i" viewBox="0 0 24 24"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.7 4H7.3a2 2 0 0 0-1.8 1.1Z"/></svg>',
+};
+
+// ---------- data ----------
+
+function showSkeleton() {
+  $('kpis').innerHTML = Array.from({ length: 4 }, () =>
+    `<div class="kpi"><span class="skel" style="width:40%"></span><span class="skel" style="width:70%;height:24px;margin-top:16px"></span></div>`).join('');
+  $('rows').innerHTML = Array.from({ length: 6 }, () =>
+    `<tr class="txn"><td colspan="7"><span class="skel" style="width:${50 + Math.random() * 40}%"></span></td></tr>`).join('');
+  $('state').hidden = true;
+}
 
 async function load(refresh = false) {
-  $('state').hidden = false; $('state').className = 'empty'; $('state').textContent = 'Loading…';
+  if (!data) showSkeleton();
+  $('refresh').classList.add('spin');
   try {
-    const res = await fetch(`/api/transactions?days=${$('days').value}${refresh ? '&refresh=1' : ''}`);
+    const r = periodRange($('days').value);
+    const qs = new URLSearchParams({ ...(r.from ? { from: r.from } : {}), ...(r.to ? { to: r.to } : {}), ...(refresh ? { refresh: 1 } : {}) });
+    const res = await fetch(`/api/transactions?${qs}`);
     if (res.status === 401) return location.assign('/login');
     const body = await res.json();
     if (!res.ok) throw new Error(body.error);
     data = body;
-    active = new Set([...active].filter((id) => data.products.some((p) => p.id === id)));
+    setupCurrency();
+    fetch(`/api/payouts${refresh ? '?refresh=1' : ''}`).then((r) => r.ok ? r.json() : null).then((b) => { payouts = b; renderPayouts(); }).catch(() => {});
+    if ($('days').value === 'all') allTime = data.rows;
+    else fetch('/api/transactions').then((r) => r.ok ? r.json() : null).then((b) => { if (b) { allTime = b.rows; render(); } }).catch(() => {});
+    active = new Set([...active].filter((name) => data.rows.some((r) => r.product === name)));
     render();
   } catch (e) {
-    $('rows').innerHTML = ''; $('kpis').innerHTML = ''; $('chips').innerHTML = '';
-    $('state').className = 'error'; $('state').textContent = e.message;
+    $('rows').innerHTML = ''; $('kpis').innerHTML = ''; $('chips').innerHTML = ''; $('chart').innerHTML = '';
+    $('state').hidden = false; $('state').className = 'state error'; $('state').textContent = e.message;
+  } finally {
+    $('refresh').classList.remove('spin');
   }
 }
 
-function render() {
-  const mode = $('mode');
-  mode.hidden = false; mode.className = `badge ${data.mode}`; mode.textContent = data.mode === 'test' ? 'Test mode' : 'Live';
+// ---------- render ----------
 
-  $('chips').innerHTML = data.products.map((p) =>
-    `<span class="chip ${active.has(p.id) ? 'on' : ''}" data-id="${esc(p.id)}" title="${esc(p.id)}">${esc(p.name)}</span>`).join('');
+function render() {
+  $('mmOpen').hidden = !data.user?.money_master;
+  const mode = $('mode');
+  mode.hidden = false; mode.className = `mode ${data.mode}`; mode.textContent = data.mode === 'test' ? 'Test mode' : 'Live';
+  if (data.user) {
+    $('who').hidden = false;
+    $('who').innerHTML = `<span class="av" title="${esc(data.user.name)}">${esc(data.user.name[0] || '?')}</span><span class="name">${esc(data.user.name)}</span>` +
+      (data.user.scope ? `<span class="scope">${esc(data.user.scope)}</span>` : '');
+  }
+  $('sub').textContent = data.user?.scope
+    ? `Payments, top-ups and refunds · ${data.user.scope.replace(/^Only /, 'only ').replace(/^Excluding /, 'excluding ')}`
+    : 'Payments, top-ups and refunds across your Stripe account.';
+  $('updated').textContent = `Updated ${new Date(data.fetched_at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`;
+  document.querySelectorAll('#kind button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === kind)));
+
+  const view = $('view').value;
+  const inView = data.rows.filter((r) => (view === 'all' || r.tracked) && (kind === 'all' || r.kind === kind));
+
+  const counts = {};
+  for (const r of inView) counts[r.product] = (counts[r.product] || 0) + 1;
+  const names = Object.keys(counts).sort((a, b) => counts[b] - counts[a] || a.localeCompare(b));
+  $('chips').innerHTML = names.map((n) =>
+    `<span class="chip ${active.has(n) ? 'on' : ''}" data-name="${esc(n)}"><span class="avatar" style="width:22px;height:22px;border-radius:7px;font-size:10px">${esc(initials(n))}</span>${esc(n)}<span class="count">${counts[n]}</span></span>`).join('') +
+    (active.size ? '<span class="chip clear" data-clear="1">Clear</span>' : '');
 
   const q = $('q').value.trim().toLowerCase();
-  const rows = data.rows.filter((r) => (!active.size || active.has(r.product_id)) && (!q || r.customer.toLowerCase().includes(q)));
+  const rows = inView.filter((r) => (!active.size || active.has(r.product)) &&
+    (!q || r.customer.toLowerCase().includes(q) || r.product.toLowerCase().includes(q)));
 
-  // KPIs: totals per currency so mixed-currency accounts stay correct.
-  const totals = {};
-  for (const r of rows) totals[r.currency] = (totals[r.currency] || 0) + r.amount;
-  const revenue = Object.entries(totals).map(([c, v]) => fmtMoney(v, c)).join(' · ') || '—';
-  const customers = new Set(rows.map((r) => r.customer).filter((c) => c !== '—')).size;
-  const units = rows.reduce((n, r) => n + (r.quantity || 0), 0);
-  $('kpis').innerHTML = [
-    ['Revenue', revenue], ['Transactions', rows.length], ['Units sold', units], ['Customers', customers],
-  ].map(([l, v]) => `<div class="kpi"><div class="label">${l}</div><div class="value">${esc(v)}</div></div>`).join('');
+  shown = rows;
+  renderKpis(rows);
+  renderChart(rows);
+  renderReport(rows);
+  renderPayouts();
+  renderTable(rows);
+}
 
-  $('rows').innerHTML = rows.map((r) => `<tr>
-      <td class="c-date">${fmtDate(r.created)}</td>
-      <td class="c-product">${esc(r.product)}${r.quantity > 1 ? ` <span class="c-qty-inline">×${r.quantity}</span>` : ''}</td>
-      <td class="c-customer">${esc(r.customer)}</td>
-      <td class="num c-qty">${r.quantity ?? ''}</td>
-      <td class="num c-amount">${fmtMoney(r.amount, r.currency)}</td>
-      <td class="c-type"><span class="tag">${esc(r.source)}</span></td>
-      <td class="c-status status-${esc(r.status)}">${esc(r.status)}</td>
-      <td class="c-link"><a href="${esc(r.url)}" target="_blank" rel="noopener">View ↗</a></td>
+// Totals per currency, most-used currency first so every card lists them in the same order.
+function sumByCur(list) {
+  const t = {}, n = {};
+  for (const r of list) { t[r.currency] = (t[r.currency] || 0) + r.amount; n[r.currency] = (n[r.currency] || 0) + 1; }
+  const order = data ? curOrder() : [];
+  return Object.entries(t).sort((a, b) => order.indexOf(a[0]) - order.indexOf(b[0]) || n[b[0]] - n[a[0]]);
+}
+function curOrder() {
+  const n = {};
+  for (const r of data.rows) if (r.kind !== 'failed') n[r.currency] = (n[r.currency] || 0) + 1;
+  return Object.keys(n).sort((a, b) => n[b] - n[a]);
+}
+
+// ----- display currency -----
+const payoutCur = () => data?.rates?.base || 'aed';
+const rateFor = (cur) => cur === payoutCur() ? 1 : data?.rates?.rates?.[cur] ?? null;
+// Payout-currency cents -> display-currency cents.
+const conv = (cents) => Math.round(cents * (rateFor(displayCur) ?? 1));
+const converted = () => displayCur !== payoutCur();
+const money = (cents) => (converted() ? '<span class="approx">≈</span>' : '') + esc(fmtMoney(conv(cents), displayCur));
+const moneyText = (cents) => (converted() ? '≈ ' : '') + fmtMoney(conv(cents), displayCur);
+
+function setupCurrency() {
+  const base = payoutCur();
+  const seen = curOrder();
+  const options = [...new Set([base, ...seen, ...DISPLAY_CURS])].filter((c) => rateFor(c) != null);
+  if (!displayCur || !options.includes(displayCur)) displayCur = base;
+  $('cur').innerHTML = options.map((c) => `<option value="${c}">${c.toUpperCase()}${c === base ? ' · payout' : ''}</option>`).join('');
+  $('cur').value = displayCur;
+}
+
+// Sums over rows that settled (have payout-currency figures).
+function totals(list) {
+  const t = { gross: 0, fees: 0, refunds: 0, net: 0, payments: 0, refundCount: 0, pending: 0 };
+  const now = Date.now() / 1000;
+  for (const r of list) {
+    if (r.kind === 'failed' || r.net == null || r.settle_currency !== payoutCur()) continue;
+    if (r.kind === 'payment') { t.gross += r.settle_gross; t.fees += r.fee; t.payments++; }
+    else { t.refunds += -r.net; t.refundCount++; }
+    t.net += r.net;
+    if (r.available_on > now) t.pending += r.net;
+  }
+  return t;
+}
+
+function renderKpis(rows) {
+  const t = totals(rows);
+  const all = allTime ? totals(scopeLikeView(allTime)) : null;
+  const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+  const period = $('days').selectedOptions[0].textContent;
+  const allLine = (v) => all && $('days').value !== 'all' ? `<div class="alltime"><span>All time</span><b>${v}</b></div>` : '';
+  const feePct = t.gross ? (t.fees / t.gross * 100).toFixed(1) : null;
+  const cards = [
+    ['hero', ICON.wallet, 'Your money', money(t.net),
+      `${period} · after Stripe fees and refunds${t.pending ? ` · ${moneyText(t.pending)} still pending` : ''}`, allLine(all && money(all.net))],
+    ['feesbig', ICON.fee, 'Stripe fees', money(t.fees),
+      `${period}${feePct ? ` · ${feePct}% of sales` : ''} · processing, conversion and VAT`, allLine(all && money(all.fees))],
+    ['gross', ICON.up, 'Gross sales', money(t.gross), plural(t.payments, 'payment'), ''],
+    ['refunds', ICON.refund, 'Refunds', t.refunds ? '−' + money(t.refunds) : '—', plural(t.refundCount, 'refund'), ''],
+  ];
+  $('kpis').innerHTML = cards.map(([cls, ico, label, value, foot, extra]) =>
+    `<div class="kpi ${cls}"><div class="kpi-head"><span class="kpi-ico">${ico}</span>${label}</div><div class="value">${value}</div><div class="foot">${esc(foot)}</div>${extra}</div>`).join('');
+
+  const r = data.rates;
+  $('fxNote').hidden = !converted();
+  if (converted()) {
+    $('fxNote').innerHTML = `${ICON.info}<span>Stripe pays you in ${payoutCur().toUpperCase()}. Amounts marked ≈ are converted at 1 ${payoutCur().toUpperCase()} = ${rateFor(displayCur).toFixed(4)} ${displayCur.toUpperCase()}` +
+      (r.source === 'stripe' ? ' (rate Stripe used on your payments)' : ` (${esc(r.source)}${r.updated ? `, ${esc(fmtDate(r.updated))}` : ''})`) + '.</span>';
+  }
+}
+
+// All-time rows filtered the same way as the current view (product view, type, chips, search).
+function scopeLikeView(list) {
+  const view = $('view').value, q = $('q').value.trim().toLowerCase();
+  return list.filter((r) => (view === 'all' || r.tracked) && (kind === 'all' || r.kind === kind) &&
+    (!active.size || active.has(r.product)) && (!q || r.customer.toLowerCase().includes(q) || r.product.toLowerCase().includes(q)));
+}
+
+// Per-product earnings in the payout currency, plus what's still on its way.
+function renderReport(rows) {
+  const t = totals(rows);
+  const customers = new Set(rows.filter((r) => r.kind === 'payment').map((r) => r.customer).filter((c) => c !== '—')).size;
+  const has = t.payments || t.refundCount;
+  $('reportSub').textContent = has
+    ? `Amounts in ${displayCur.toUpperCase()}${converted() ? ` (converted from ${payoutCur().toUpperCase()}, the currency Stripe pays out)` : ', the currency Stripe pays out to you'} · ${customers} customer${customers === 1 ? '' : 's'}`
+    : 'No settled payments in this view';
+  if (!has) { $('reportSum').innerHTML = ''; $('reportRows').innerHTML = ''; $('reportFoot').innerHTML = ''; $('reportNote').innerHTML = ''; return; }
+  $('reportSum').innerHTML = [
+    ['Gross sales', money(t.gross), ''], ['Stripe fees', '−' + money(t.fees), 'neg'],
+    ['Refunds', t.refunds ? '−' + money(t.refunds) : money(0), t.refunds ? 'neg' : ''], ['Your money', money(t.net), 'net'],
+  ].map(([l, v, c]) => `<div><div class="l">${l}</div><div class="v ${c}">${v}</div></div>`).join('');
+
+  const now = Date.now() / 1000;
+  const pending = rows.filter((r) => r.net != null && r.available_on > now && r.kind !== 'failed');
+  const nextDate = pending.length ? Math.min(...pending.map((r) => r.available_on)) : null;
+  $('reportNote').innerHTML = t.pending
+    ? `${ICON.clock}<span><b>${money(t.pending)}</b> is still on its way from Stripe · next funds available <b>${esc(fmtDate(nextDate))}</b></span>`
+    : `${ICON.check}<span>All funds in this view are available in your Stripe balance.</span>`;
+
+  const by = new Map();
+  for (const r of rows) {
+    if (r.kind === 'failed' || r.net == null || r.settle_currency !== payoutCur()) continue;
+    const g = by.get(r.product) || { name: r.product, count: 0, gross: 0, fees: 0, refunds: 0, net: 0 };
+    if (r.kind === 'payment') { g.count++; g.gross += r.settle_gross; g.fees += r.fee; } else g.refunds += -r.net;
+    g.net += r.net;
+    by.set(r.product, g);
+  }
+  const groups = [...by.values()].sort((a, b) => b.net - a.net);
+  const mobile = matchMedia('(max-width: 640px)').matches;
+  $('reportRows').innerHTML = groups.map((g) => `<tr>
+      <td class="rp-name"><div class="prod"><span class="avatar" style="width:26px;height:26px;font-size:11px">${esc(initials(g.name))}</span>${esc(g.name)}</div></td>
+      <td class="num rp-col">${g.count}</td>
+      <td class="num rp-col">${money(g.gross)}</td>
+      <td class="num rp-col">−${money(g.fees)}</td>
+      <td class="num rp-col">${g.refunds ? `<span style="color:var(--refund)">−${money(g.refunds)}</span>` : '—'}</td>
+      <td class="num rp-net"><b>${money(g.net)}</b></td>
+      <td class="rp-meta" style="${mobile ? '' : 'display:none'}">${g.count} payment${g.count === 1 ? '' : 's'} · ${money(g.gross)} gross · −${money(g.fees)} fees${g.refunds ? ` · −${money(g.refunds)} refunds` : ''}</td>
     </tr>`).join('');
+  $('reportFoot').innerHTML = groups.length > 1 ? `<tr>
+      <td class="rp-name">Total</td><td class="num rp-col">${t.payments}</td><td class="num rp-col">${money(t.gross)}</td>
+      <td class="num rp-col">−${money(t.fees)}</td><td class="num rp-col">${t.refunds ? `−${money(t.refunds)}` : '—'}</td><td class="num rp-net">${money(t.net)}</td>
+    </tr>` : '';
+}
+
+// Payouts: what already reached the bank, and what's coming in the next cycle.
+function renderPayouts() {
+  if (!payouts || !data) { $('poCards').innerHTML = '<span class="skel" style="width:60%;height:60px"></span>'; return; }
+  const p = payouts;
+  const pc = p.currency;
+  // Payout amounts are in the payout currency; show them in the chosen currency like the rest.
+  const pm = (cents) => pc === payoutCur() ? money(cents) : esc(fmtMoney(cents, pc));
+  const bank = p.bank ? `${esc(p.bank.name)} •••• ${esc(p.bank.last4)}` : 'your bank';
+  const daysUntil = (t) => Math.max(0, Math.ceil((t * 1000 - Date.now()) / 864e5));
+  $('poSub').textContent = `${p.schedule.text}${p.schedule.delay_days ? ` · payments become available ${p.schedule.delay_days} days after they're made` : ''}` +
+    (p.scoped ? ' · showing your share (payments you can see)' : '');
+
+  const paidList = p.payouts.filter((x) => x.status === 'paid');
+  const last = paidList[0];
+  const n = p.next;
+  const total = n ? n.available_now + n.becoming_available : 0;
+  const cards = [];
+  if (n) {
+    const a = total ? (n.available_now / total) * 100 : 0;
+    cards.push(`<div class="po-card next">
+      <div class="l">${ICON.clock}Next payout</div>
+      <div class="date"><b>${esc(new Date(n.date * 1000).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }))}</b> · in ${daysUntil(n.date)} day${daysUntil(n.date) === 1 ? '' : 's'} · to ${bank}</div>
+      <div class="v">${pm(n.amount)}</div>
+      ${total ? `<div class="po-bar"><i style="width:${a}%;background:var(--ok)"></i><i style="width:${100 - a}%;background:var(--accent)"></i></div>` : ''}
+      <div class="s"><b>${pm(n.available_now)}</b> already available · <b>${pm(n.becoming_available)}</b> becoming available before then · ${n.count} transaction${n.count === 1 ? '' : 's'} · estimate</div>
+    </div>`);
+  } else {
+    cards.push(`<div class="po-card next"><div class="l">${ICON.clock}Next payout</div><div class="v">—</div><div class="s">${esc(p.schedule.text)}</div></div>`);
+  }
+  cards.push(`<div class="po-card">
+      <div class="l">${ICON.check}Paid to your bank</div>
+      <div class="v">${pm(p.paid_out)}</div>
+      <div class="s">${paidList.length} payout${paidList.length === 1 ? '' : 's'}${last ? ` · last on <b>${esc(fmtDate(last.arrival_date))}</b> (${pm(last.amount)})` : ''}${p.in_transit ? ` · <b>${pm(p.in_transit)}</b> on the way` : ''}</div>
+    </div>`);
+  cards.push(p.after && p.after.amount
+    ? `<div class="po-card"><div class="l">${ICON.clock}Following payout</div><div class="date"><b>${esc(fmtDate(p.after.date))}</b></div><div class="v">${pm(p.after.amount)}</div><div class="s">Funds that become available after the next payout</div></div>`
+    : p.balance
+      ? `<div class="po-card"><div class="l">${ICON.wallet}Stripe balance now</div><div class="v">${pm(p.balance.available + p.balance.pending)}</div><div class="s"><b>${pm(p.balance.available)}</b> available · <b>${pm(p.balance.pending)}</b> pending</div></div>`
+      : `<div class="po-card"><div class="l">${ICON.info}How payouts work</div><div class="s" style="margin-top:6px">Stripe holds each payment for ${p.schedule.delay_days || 'a few'} days, then sends everything available to ${bank} ${p.schedule.text.toLowerCase().replace('monthly on', 'on')}.</div></div>`);
+  $('poCards').innerHTML = cards.join('');
+
+  $('poRows').innerHTML = p.payouts.length ? p.payouts.map((x) => {
+    const open = openPayouts.has(x.id);
+    return `<tr class="po-row${open ? ' expanded' : ''}" data-po="${esc(x.id)}">
+      <td>${esc(fmtDate(x.arrival_date))}${x.bank ? `<span class="po-tag">${esc(x.bank.name)} •••• ${esc(x.bank.last4)}</span>` : ''}</td>
+      <td><span class="po-pill ${esc(x.status)}">${esc(x.status.replace('_', ' '))}</span></td>
+      <td class="num pc-hide">${x.payments}${x.refunds ? ` <span class="po-tag" style="display:inline">+${x.refunds} refund${x.refunds === 1 ? '' : 's'}</span>` : ''}</td>
+      <td class="num pc-hide">${pm(x.gross)}</td>
+      <td class="num pc-hide">−${pm(x.fees)}</td>
+      <td class="num pc-hide">${x.refunded ? `−${pm(x.refunded)}` : '—'}</td>
+      <td class="num"><b>${pm(x.amount)}</b>${x.other ? `<span class="po-tag">incl. ${pm(x.other)} account fees/other</span>` : ''}</td>
+    </tr>` + (open ? `<tr class="po-items"><td colspan="7">${x.items.map((it) => `<div class="it"><span>${esc(fmtDate(it.created))} · ${esc(it.product)}${it.kind === 'refund' ? ' (refund)' : ''}</span><b>${pm(it.net)}</b></div>`).join('') || '<div class="it">No transactions you can see</div>'}</td></tr>` : '');
+  }).join('') : `<tr><td colspan="7" class="state">No payouts yet</td></tr>`;
+}
+
+// Every column a bookkeeper would want, for the rows currently shown.
+function downloadCsv() {
+  const cols = [
+    ['Date', (r) => new Date(r.created * 1000).toISOString().slice(0, 10)],
+    ['Time', (r) => new Date(r.created * 1000).toTimeString().slice(0, 5)],
+    ['Type', (r) => r.kind], ['Status', (r) => r.status], ['Product', (r) => r.product], ['Customer', (r) => r.customer],
+    ['Source', (r) => r.source], ['Quantity', (r) => r.quantity ?? ''],
+    ['Amount', (r) => (r.amount / 100).toFixed(2)], ['Currency', (r) => r.currency.toUpperCase()],
+    ['Refunded', (r) => r.refunded_amount ? (r.refunded_amount / 100).toFixed(2) : ''],
+    ['Converted amount', (r) => r.settle_gross != null ? (r.settle_gross / 100).toFixed(2) : ''],
+    ['Stripe fees', (r) => r.fee != null ? (r.fee / 100).toFixed(2) : ''],
+    ['Net (you receive)', (r) => r.net != null ? (r.net / 100).toFixed(2) : ''],
+    ['Payout currency', (r) => (r.settle_currency || '').toUpperCase()],
+    ['Exchange rate', (r) => r.exchange_rate ?? ''],
+    ['Funds available on', (r) => r.available_on ? new Date(r.available_on * 1000).toISOString().slice(0, 10) : ''],
+    ['Funds status', (r) => r.funds_status || ''],
+    ['Payout', (r) => !r.payout ? '' : r.payout.status === 'upcoming' ? 'upcoming' : r.payout.status],
+    ['Payout date', (r) => r.payout?.date ? new Date(r.payout.date * 1000).toISOString().slice(0, 10) : ''],
+    ['Payment ID', (r) => r.payment_intent || r.id], ['Stripe link', (r) => r.url],
+  ];
+  const cell = (v) => { const t = String(v ?? ''); return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
+  const csv = [cols.map(([h]) => h).join(','), ...shown.map((r) => cols.map(([, f]) => cell(f(r))).join(','))].join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = `stripe-transactions-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+// Payments up, refunds down, per day/week/month depending on how much time is shown.
+function renderChart(rows) {
+  // Built from payout-currency figures so every sale lands on one scale, shown in the chosen currency.
+  const settled = rows.filter((r) => r.kind !== 'failed' && r.net != null && r.settle_currency === payoutCur());
+  chartCur = displayCur;
+  $('curTabs').innerHTML = `<span class="tag-soft">${displayCur.toUpperCase()}${converted() ? ' ≈' : ''}</span>`;
+  const el = $('chart');
+  const list = settled;
+  const money = settled;
+  if (!list.length) { el.innerHTML = '<div class="chart-empty">No revenue in this period</div>'; return; }
+
+  const now = Date.now() / 1000;
+  const pr = periodRange($('days').value);
+  const startSec = pr.from || Math.min(...money.map((r) => r.created));
+  const endSec = Math.min(pr.to || now, now);
+  const spanDays = (endSec - startSec) / 86400;
+  const unit = spanDays <= 1.01 ? 'hour' : spanDays <= 45 ? 'day' : spanDays <= 120 ? 'week' : 'month';
+  const floor = (sec) => {
+    const d = new Date(sec * 1000);
+    if (unit === 'hour') { d.setMinutes(0, 0, 0); return d; }
+    d.setHours(0, 0, 0, 0);
+    if (unit === 'week') d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+    if (unit === 'month') d.setDate(1);
+    return d;
+  };
+  const step = (d) => {
+    const n = new Date(d);
+    if (unit === 'hour') n.setHours(n.getHours() + 1);
+    else if (unit === 'day') n.setDate(n.getDate() + 1);
+    else if (unit === 'week') n.setDate(n.getDate() + 7);
+    else n.setMonth(n.getMonth() + 1);
+    return n;
+  };
+  const buckets = [];
+  // Whole period for past periods; up to now for the current one.
+  const last = new Date((pr.to && pr.to <= now ? pr.to - 1 : now) * 1000);
+  for (let d = floor(startSec); d <= last; d = step(d)) buckets.push({ t: d, pay: 0, ref: 0 });
+  const idx = new Map(buckets.map((b, i) => [b.t.getTime(), i]));
+  for (const r of list) {
+    const i = idx.get(floor(r.created).getTime());
+    if (i === undefined) continue;
+    if (r.kind === 'payment') buckets[i].pay += conv(r.settle_gross); else buckets[i].ref += conv(-r.net);
+  }
+
+  const W = el.clientWidth || 800, H = el.clientHeight || 200;
+  const padL = 4, padR = 4, padT = 6, padB = 22;
+  const maxPay = Math.max(...buckets.map((b) => b.pay), 1);
+  const maxRef = Math.max(...buckets.map((b) => b.ref), 0);
+  const total = maxPay + maxRef;
+  const plotH = H - padT - padB;
+  const zeroY = padT + plotH * (maxPay / total);
+  const bw = (W - padL - padR) / buckets.length;
+  const barW = Math.max(2, Math.min(28, bw - 2)); // keeps a 2px surface gap between bars
+  const r4 = Math.min(4, barW / 2);
+  const h = (v) => (v / total) * plotH;
+  // Rounded at the data end, square at the baseline.
+  const barUp = (x, v) => h(v) < 0.5 ? '' : `<path fill="var(--accent)" d="M${x},${zeroY}V${zeroY - h(v) + r4}q0,-${r4} ${r4},-${r4}h${barW - 2 * r4}q${r4},0 ${r4},${r4}V${zeroY}Z"/>`;
+  const barDown = (x, v) => h(v) < 0.5 ? '' : `<path fill="var(--refund)" d="M${x},${zeroY}V${zeroY + h(v) - r4}q0,${r4} ${r4},${r4}h${barW - 2 * r4}q${r4},0 ${r4},-${r4}V${zeroY}Z"/>`;
+  const tick = (d) => unit === 'hour' ? d.toLocaleTimeString(undefined, { hour: 'numeric' })
+    : d.toLocaleDateString(undefined, unit === 'month' ? { month: 'short', year: '2-digit' } : { month: 'short', day: 'numeric' });
+  const every = Math.ceil(buckets.length / Math.max(2, Math.floor(W / 80)));
+
+  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Payments and refunds per ${unit} in ${chartCur.toUpperCase()}">`;
+  svg += `<g class="grid">${[1 / 3, 2 / 3, 1].map((f) => { const y = zeroY - (zeroY - padT) * f; return `<line x1="${padL}" x2="${W - padR}" y1="${y}" y2="${y}" stroke-dasharray="2 4"/>`; }).join('')}</g>`;
+  buckets.forEach((b, i) => { const x = padL + i * bw + (bw - barW) / 2; svg += barUp(x, b.pay) + barDown(x, b.ref); });
+  svg += `<line class="zero" x1="${padL}" x2="${W - padR}" y1="${zeroY}" y2="${zeroY}"/>`;
+  svg += `<g class="axis">${buckets.map((b, i) => i % every ? '' : `<text x="${padL + i * bw + bw / 2}" y="${H - 5}" text-anchor="middle">${esc(tick(b.t))}</text>`).join('')}</g>`;
+  svg += `<g>${buckets.map((b, i) => `<rect class="hit" data-i="${i}" x="${padL + i * bw}" y="${padT}" width="${bw}" height="${plotH}" rx="4"/>`).join('')}</g>`;
+  svg += `</svg><div class="tip" id="tip" hidden></div>`;
+  el.innerHTML = svg;
+
+  const tip = $('tip');
+  el.querySelectorAll('.hit').forEach((hit) => {
+    hit.addEventListener('mouseenter', () => {
+      const b = buckets[hit.dataset.i];
+      const label = unit === 'hour' ? `${b.t.toLocaleTimeString(undefined, { hour: 'numeric' })} – ${step(b.t).toLocaleTimeString(undefined, { hour: 'numeric' })}`
+        : unit === 'day' ? b.t.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
+        : unit === 'week' ? `Week of ${b.t.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
+        : b.t.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+      tip.innerHTML = `<b>${esc(label)}</b><div><span>Payments</span><span>${fmtMoney(b.pay, chartCur)}</span></div>` +
+        (b.ref ? `<div><span>Refunds</span><span>−${fmtMoney(b.ref, chartCur)}</span></div>` : '') +
+        `<div><span>Net</span><span>${fmtMoney(b.pay - b.ref, chartCur)}</span></div>`;
+      const xPx = Number(hit.getAttribute('x')) + bw / 2;
+      tip.style.left = `${Math.min(Math.max(xPx, 85), W - 85)}px`;
+      tip.style.top = '0px';
+      tip.hidden = false;
+    });
+    hit.addEventListener('mouseleave', () => { tip.hidden = true; });
+  });
+}
+
+function renderTable(rows) {
+  $('count').textContent = rows.length ? `${rows.length}` : '';
+  let html = '', lastDay = '';
+  for (const r of rows) {
+    const dk = dayKey(r.created);
+    if (dk !== lastDay) {
+      lastDay = dk;
+      const net = sumByCur(rows.filter((x) => dayKey(x.created) === dk && x.kind !== 'failed'))
+        .map(([c, v]) => fmtMoney(v, c)).join(' · ');
+      html += `<tr class="group"><td colspan="7">${esc(dayLabel(r.created))}${net ? `<span>${esc(net)}</span>` : ''}</td></tr>`;
+    }
+    const avatar = r.kind === 'refund' ? `<span class="avatar refund">${ICON.refund}</span>`
+      : r.kind === 'failed' ? `<span class="avatar failed">${ICON.failed}</span>`
+      : `<span class="avatar">${esc(initials(r.product))}</span>`;
+    const note = r.refunded_amount && r.status !== 'refunded'
+      ? `<span class="refund-note">−${fmtMoney(r.refunded_amount, r.currency)} refunded</span>` : '';
+    const poWhen = r.payout && (r.payout.date ? fmtShort(r.payout.date) : null);
+    const poTag = !r.payout ? '' : r.kind === 'refund'
+      ? `<span class="po-tag">${poWhen ? `Deducted from ${r.payout.status === 'upcoming' ? 'next' : ''} payout ${esc(poWhen)}`.replace('  ', ' ') : 'Deducted from a later payout'}</span>`
+      : r.payout.status === 'upcoming'
+        ? `<span class="po-tag">${poWhen ? `Next payout ${esc(poWhen)}` : 'Later payout'}</span>`
+        : `<span class="po-tag paid">Paid out ${esc(poWhen)}</span>`;
+    const netLine = r.net != null && r.kind === 'payment' ? `<span class="net-line">You get ${esc(moneyText(r.net))}</span>${poTag}` : r.kind === 'refund' ? poTag : '';
+    html += `<tr class="txn${r.kind === 'failed' ? ' unpaid' : ''}"${r.payment_intent ? ` data-pi="${esc(r.payment_intent)}"` : ''}>
+      <td class="c-product"><div class="prod">${avatar}<span>${esc(r.product)}${r.quantity > 1 ? ` <span class="qty">×${r.quantity}</span>` : ''}</span></div></td>
+      <td class="c-customer cust">${esc(r.customer)}</td>
+      <td class="c-meta src">${esc(r.source)}<span class="time-inline"> · ${fmtTime(r.created)}</span></td>
+      <td class="c-time time">${fmtTime(r.created)}</td>
+      <td class="c-status"><span class="pill ${esc(r.status.replace(/ /g, '-'))}">${esc(r.status)}</span></td>
+      <td class="num c-amount"><span class="amount${r.amount < 0 ? ' neg' : ''}">${fmtMoney(r.amount, r.currency)}</span>${note}${netLine}</td>
+      <td class="c-link"><a class="open" href="${esc(r.url)}" target="_blank" rel="noopener" title="Open in Stripe" aria-label="Open in Stripe">${ICON.open}</a></td>
+    </tr>`;
+  }
+  $('rows').innerHTML = html;
 
   $('state').hidden = rows.length > 0;
-  $('state').className = 'empty';
-  $('state').textContent = !data.products.length
-    ? 'No products selected yet — click “Choose products” to pick which ones to track.'
-    : 'No transactions for the selected products in this period.';
+  $('state').className = 'state';
+  $('state').innerHTML = ICON.empty + '<div>' + ($('view').value === 'tracked' && !data.tracked.length
+    ? 'No tracked products yet — click “Tracked products” to choose some.'
+    : 'No transactions match these filters in this period.') + '</div>';
+}
 
-  $('meta').textContent = `Updated ${new Date(data.fetched_at).toLocaleTimeString()} · auto-refreshes every minute` +
-    (data.truncated ? ' · Showing the most recent 1,000 records per source; narrow the date range for complete totals.' : '');
+// ---------- events ----------
+
+$('csv').addEventListener('click', downloadCsv);
+$('poRows').addEventListener('click', (e) => {
+  const tr = e.target.closest('tr.po-row'); if (!tr) return;
+  if (openPayouts.has(tr.dataset.po)) openPayouts.delete(tr.dataset.po); else openPayouts.add(tr.dataset.po);
+  renderPayouts();
+});
+$('rows').addEventListener('click', (e) => {
+  if (e.target.closest('a')) return; // the arrow still opens Stripe
+  const tr = e.target.closest('tr[data-pi]');
+  if (tr) openDetail(tr.dataset.pi);
+});
+
+// ----- payment detail -----
+const cap = (t) => t ? t.charAt(0).toUpperCase() + t.slice(1) : '';
+const flag = (cc) => cc && cc.length === 2 ? String.fromCodePoint(...[...cc.toUpperCase()].map((c) => 0x1f1a5 + c.charCodeAt(0))) : '';
+const regionName = (cc) => { try { return new Intl.DisplayNames(undefined, { type: 'region' }).of(cc); } catch { return cc; } };
+const copyBtn = (text) => `<button class="copy" data-copy="${esc(text)}" title="Copy" aria-label="Copy">${ICON.copy}</button>`;
+
+$('dwClose').addEventListener('click', () => $('detail').close());
+$('detail').addEventListener('close', () => { if (location.hash) history.replaceState(null, '', location.pathname + location.search); });
+$('detail').addEventListener('click', (e) => {
+  const c = e.target.closest('[data-copy]');
+  if (c) { navigator.clipboard?.writeText(c.dataset.copy); c.innerHTML = ICON.check; setTimeout(() => { c.innerHTML = ICON.copy; }, 1200); }
+  if (e.target === $('detail')) $('detail').close(); // click on the backdrop
+});
+
+async function openDetail(pi) {
+  if (!$('detail').open) $('detail').showModal();
+  history.replaceState(null, '', `#${pi}`);
+  $('dwActions').innerHTML = '';
+  $('dwBody').innerHTML = `<div class="dw-loading">${['30%', '55%', '90%', '80%', '70%', '85%'].map((w, i) => `<span class="skel" style="width:${w};height:${i ? 14 : 30}px"></span>`).join('')}</div>`;
+  try {
+    const res = await fetch(`/api/payments/${encodeURIComponent(pi)}`);
+    if (res.status === 401) return location.assign('/login');
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.error);
+    renderDetail(d);
+  } catch (e) {
+    $('dwBody').innerHTML = `<div class="state error">${esc(e.message)}</div>`;
+  }
+}
+
+function renderDetail(d) {
+  const b = d.breakdown;
+  const m = fmtMoney;
+  const statusCls = d.status.replace(/ /g, '-').replace('succeeded', 'paid');
+  $('dwActions').innerHTML =
+    (d.receipt_url ? `<a class="btn-ghost" href="${esc(d.receipt_url)}" target="_blank" rel="noopener">${ICON.receipt}Receipt</a>` : '') +
+    `<a class="btn-ghost" href="${esc(d.stripe_url)}" target="_blank" rel="noopener">Open in Stripe ${ICON.open}</a>`;
+
+  const hero = `<div class="dw-hero"><div>
+      <div class="dw-amount">${esc(m(d.amount, d.currency))}<span class="cur">${d.currency.toUpperCase()}</span><span class="pill ${esc(statusCls)}">${esc(d.status)}</span></div>
+      <div class="dw-sub">${d.customer.name || d.customer.email ? `Charged to <a href="${esc(d.links.customer || d.stripe_url)}" target="_blank" rel="noopener">${esc(d.customer.name || d.customer.email)}</a> · ` : ''}${esc(d.product || '')} · ${esc(d.source)}</div>
+    </div></div>`;
+
+  const timeline = `<section class="dw-sec"><h3>Recent activity</h3><ul class="tl">${d.events.map((e) => `<li>
+      <span class="dot ${e.tone}${e.future ? ' future' : ''}"></span>
+      <div><div class="t">${esc(e.label)}</div>${e.detail ? `<div class="d">${esc(e.detail)}</div>` : ''}</div>
+      <time>${esc(e.future ? fmtDate(e.at) : fmtDateTime(e.at))}</time></li>`).join('')}</ul></section>`;
+
+  const t = d.totals;
+  const tf = t ? [
+    t.discount ? ['Discount', `−${m(t.discount, t.currency)}`] : null,
+    t.tax ? ['Tax', m(t.tax, t.currency)] : null,
+    t.shipping ? ['Shipping', m(t.shipping, t.currency)] : null,
+    t.credit ? ['Paid from customer balance', `−${m(t.credit, t.currency)}`] : null,
+  ].filter(Boolean) : [];
+  const summary = `<section class="dw-sec"><h3>${d.ids.invoice ? 'Invoice summary' : 'Checkout summary'}</h3>
+    <div class="kv"><div class="k">Customer</div><div class="v">${[d.customer.email, d.customer.name, d.customer.country && `${flag(d.customer.country)} ${regionName(d.customer.country)}`].filter(Boolean).map(esc).join('<br>') || '—'}</div></div>
+    ${d.ids.invoice_number ? `<div class="kv"><div class="k">Invoice</div><div class="v"><a href="${esc(d.links.invoice)}" target="_blank" rel="noopener">${esc(d.ids.invoice_number)}</a>${d.links.hosted_invoice ? ` · <a href="${esc(d.links.hosted_invoice)}" target="_blank" rel="noopener">Customer view</a>` : ''}</div></div>` : ''}
+    <table class="items"><thead><tr><th>Items</th><th class="r">Qty</th><th class="r">Unit price</th><th class="r">Amount</th></tr></thead>
+      <tbody>${d.items.map((i) => `<tr><td>${esc(i.name)}${i.period ? `<span class="period">${esc(fmtDate(i.period.start))} – ${esc(fmtDate(i.period.end))}</span>` : ''}</td>
+        <td class="r">${i.quantity ?? ''}</td><td class="r">${i.unit_amount != null ? esc(m(i.unit_amount, i.currency)) : ''}</td><td class="r">${esc(m(i.amount, i.currency))}</td></tr>`).join('')}</tbody>
+      <tfoot>${tf.map(([k, v]) => `<tr><td colspan="3" class="r">${k}</td><td class="r">${esc(v)}</td></tr>`).join('')}
+        <tr class="total"><td colspan="3" class="r">Total${t?.paid != null && t.paid !== t.total ? ' charged' : ''}</td><td class="r">${esc(m(t?.paid ?? t?.total ?? d.amount, t?.currency || d.currency))}</td></tr></tfoot>
+    </table></section>`;
+
+  let breakdown = '';
+  if (b) {
+    const chargeConverted = b.currency !== b.settle_currency;
+    breakdown = `<section class="dw-sec"><h3>Payment breakdown</h3>
+      ${chargeConverted ? `<p class="hint">Charge was received in ${b.currency.toUpperCase()}, but the funds are paid out to you in ${b.settle_currency.toUpperCase()}.</p>` : ''}
+      <div class="bd">
+        <div class="bd-row"><div class="k">Payment amount${chargeConverted && b.exchange_rate ? `<small>1 ${b.currency.toUpperCase()} = ${b.exchange_rate} ${b.settle_currency.toUpperCase()}</small>` : ''}</div>
+          <div class="v">${chargeConverted ? `<span class="from">${esc(m(b.amount, b.currency))} →</span>` : ''}${esc(m(b.settle_amount, b.settle_currency))}</div></div>
+        <details class="fees"><summary class="bd-row"><div class="k">Stripe fees<small>${b.settle_amount ? ((b.fee / b.settle_amount) * 100).toFixed(2) + '% of this payment' : ''}</small></div><div class="v">−${esc(m(b.fee, b.settle_currency))}</div></summary>
+          ${b.fees.map((f) => `<div class="fee-row"><span>${esc(f.label)}</span><span>−${esc(m(f.amount, f.currency))}</span></div>`).join('')}
+        </details>
+        <div class="bd-row total"><div class="k">Net amount</div><div class="v">${esc(m(b.net, b.settle_currency))}${b.settle_currency === payoutCur() && converted() ? `<span class="net-line">≈ ${esc(fmtMoney(conv(b.net), displayCur))}</span>` : ''}</div></div>
+        ${b.refunded ? `<div class="bd-row bad"><div class="k">Refunded</div><div class="v">−${esc(m(b.refunded, b.settle_currency))}</div></div>
+          <div class="bd-row total ${b.net_after_refunds < 0 ? 'bad' : 'good'}"><div class="k">You keep</div><div class="v">${esc(m(b.net_after_refunds, b.settle_currency))}</div></div>` : ''}
+      </div>
+      ${b.refunded ? `<div class="callout bad">${ICON.info}<span>Stripe doesn't return its fees when you refund${chargeConverted ? ', and the exchange rate on the refund can differ' : ''}, so this payment ${b.net_after_refunds < 0 ? `cost you ${esc(m(-b.net_after_refunds, b.settle_currency))}` : `left you ${esc(m(b.net_after_refunds, b.settle_currency))}`}.</span></div>` : ''}
+      <div class="callout">${ICON.clock}<span>${b.funds_status === 'available' ? 'Funds became available' : 'Funds will be available'} in your Stripe balance on <b>${esc(fmtDate(b.available_on))}</b>.</span></div>
+    </section>`;
+  } else if (['failed', 'canceled'].includes(d.status)) {
+    breakdown = `<section class="dw-sec"><h3>Payment breakdown</h3><div class="callout">${ICON.info}<span>No money moved for this payment, so there are no fees.</span></div></section>`;
+  }
+
+  const refunds = d.refunds.length ? `<section class="dw-sec"><h3>Refunds</h3>${d.refunds.map((r) => `<div class="kv">
+      <div class="k">${esc(fmtDateTime(r.created))}</div>
+      <div class="v"><b style="color:var(--refund)">−${esc(m(r.amount, r.currency))}</b>${r.settle_amount != null && r.settle_currency !== r.currency ? ` (−${esc(m(r.settle_amount, r.settle_currency))})` : ''} · ${esc(cap(r.status))}${r.reason ? ` · ${esc(cap(r.reason))}` : ''}</div></div>`).join('')}</section>` : '';
+
+  const pm = d.method;
+  const checks = pm?.checks ? Object.entries(pm.checks).filter(([, v]) => v).map(([k, v]) => `${k.toUpperCase()} ${v.replace(/_/g, ' ')}`).join(' · ') : '';
+  const pmRows = pm ? [
+    ['Type', pm.type === 'card' ? `${cap(pm.funding || '')} card`.trim() : cap(pm.type?.replace(/_/g, ' '))],
+    ['Number', pm.last4 ? `•••• ${pm.last4}` : null], ['Brand', cap(pm.brand)], ['Expires', pm.exp],
+    ['Issuer', pm.country ? `${flag(pm.country)} ${regionName(pm.country)}` : null], ['Wallet', pm.wallet ? cap(pm.wallet.replace(/_/g, ' ')) : null],
+    ['3D Secure', pm.three_d_secure ? cap(pm.three_d_secure.replace(/_/g, ' ')) : null], ['Checks', checks || null],
+  ].filter(([, v]) => v) : [];
+  const method = pmRows.length ? `<section class="dw-sec"><h3>Payment method</h3><div class="pm-grid">${pmRows.map(([k, v]) => `<div class="kv"><div class="k">${k}</div><div class="v">${esc(v)}</div></div>`).join('')}</div></section>` : '';
+
+  const f = (k, v) => v ? `<div class="f"><div class="k">${k}</div><div class="v">${v}</div></div>` : '';
+  const side = `<aside class="side">
+    <div class="block"><h4>Details</h4>
+      ${f('Payment ID', `<span class="mono">${esc(d.id)}</span>${copyBtn(d.id)}`)}
+      ${f('Payment method', pm?.last4 ? `<span class="brand-badge">${esc(pm.brand || pm.type)}</span> •••• ${esc(pm.last4)}` : esc(cap(pm?.type || '')))}
+      ${f('Risk level', d.risk?.level ? `<span class="risk ${esc(d.risk.level)}">${esc(d.risk.level.replace(/_/g, ' '))}</span>${d.risk.score != null ? ` score ${d.risk.score}` : ''}` : '')}
+      ${f('Description', esc(d.description || '—'))}
+      ${f('Statement descriptor', esc(d.statement_descriptor || '—'))}
+      ${b ? f('Funds available', `${esc(fmtDate(b.available_on))} <span class="tag-soft">${esc(cap(b.funds_status))}</span>`) : ''}
+      ${(() => { const r = data?.rows.find((x) => x.payment_intent === d.id && x.payout); if (!r) return ''; return f('Payout', r.payout.status === 'upcoming'
+        ? (r.payout.date ? `In the next payout · ${esc(fmtDate(r.payout.date))}` : 'In a later payout')
+        : `Paid out ${esc(fmtDate(r.payout.date))} <span class="tag-soft">${esc(cap(r.payout.status.replace('_', ' ')))}</span>`); })()}
+      ${f('Last updated', esc(fmtDateTime(d.updated)))}
+    </div>
+    <div class="block"><h4>Customer ${d.customer.guest ? '<span class="tag-soft">Guest</span>' : ''}</h4>
+      ${f('ID', d.customer.id ? `<a class="mono" href="${esc(d.links.customer)}" target="_blank" rel="noopener">${esc(d.customer.id)}</a>` : '')}
+      ${f('Name', esc(d.customer.name || ''))}
+      ${f('Email', d.customer.email ? `${esc(d.customer.email)}${copyBtn(d.customer.email)}` : '')}
+      ${f('Phone', esc(d.customer.phone || ''))}
+      ${f('Country', d.customer.country ? `${flag(d.customer.country)} ${esc(regionName(d.customer.country))}` : '')}
+    </div>
+    <div class="block" style="border:0"><h4>References</h4>
+      ${f('Charge', d.ids.charge ? `<span class="mono">${esc(d.ids.charge)}</span>${copyBtn(d.ids.charge)}` : '')}
+      ${f('Checkout Session', d.ids.checkout_session ? `<span class="mono">${esc(d.ids.checkout_session.slice(0, 24))}…</span>${copyBtn(d.ids.checkout_session)}` : '')}
+      ${f('Invoice', d.ids.invoice ? `<span class="mono">${esc(d.ids.invoice)}</span>${copyBtn(d.ids.invoice)}` : '')}
+      ${f('Subscription', d.ids.subscription ? `<span class="mono">${esc(d.ids.subscription)}</span>${copyBtn(d.ids.subscription)}` : '')}
+    </div>
+  </aside>`;
+
+  $('dwBody').innerHTML = hero + `<div class="dw-grid"><div>${timeline}${summary}${breakdown}${refunds}${method}</div>${side}</div>`;
 }
 
 $('chips').addEventListener('click', (e) => {
-  const id = e.target.dataset?.id; if (!id) return;
-  active.has(id) ? active.delete(id) : active.add(id);
+  const chip = e.target.closest('.chip'); if (!chip) return;
+  if (chip.dataset.clear) active.clear();
+  else if (active.has(chip.dataset.name)) active.delete(chip.dataset.name);
+  else active.add(chip.dataset.name);
   render();
 });
-$('days').addEventListener('change', () => load());
+$('kind').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  kind = b.dataset.v; store.set('kind', kind); active.clear(); if (data) render();
+});
+$('curTabs').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  chartCur = b.dataset.cur; if (data) render();
+});
+$('cur').addEventListener('change', () => { displayCur = $('cur').value; store.set('cur', displayCur); if (data) render(); });
+$('view').addEventListener('change', () => { store.set('view', $('view').value); active.clear(); if (data) render(); });
+$('days').addEventListener('change', () => { store.set('period', $('days').value); load(); });
 $('refresh').addEventListener('click', () => load(true));
-$('q').addEventListener('input', () => data && render());
+$('q').addEventListener('input', () => { if (data) render(); });
+let resizeT;
+window.addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(() => { if (data) renderChart(currentRows()); }, 150); });
+function currentRows() {
+  const view = $('view').value, q = $('q').value.trim().toLowerCase();
+  return data.rows.filter((r) => (view === 'all' || r.tracked) && (kind === 'all' || r.kind === kind) &&
+    (!active.size || active.has(r.product)) && (!q || r.customer.toLowerCase().includes(q) || r.product.toLowerCase().includes(q)));
+}
 
 // ----- product picker -----
-let catalog = [];
 $('manage').addEventListener('click', async () => {
-  $('dlgbody').innerHTML = '<p class="empty">Loading products…</p>';
+  $('dlgbody').innerHTML = '<p class="state">Loading products…</p>';
+  $('dlgq').value = '';
   $('dlg').showModal();
   try {
     const res = await fetch('/api/catalog');
     if (res.status === 401) return location.assign('/login');
     const body = await res.json();
     if (!res.ok) throw new Error(body.error);
-    catalog = body.products;
     const sel = new Set(body.selected);
-    $('dlgbody').innerHTML = catalog.length ? catalog.map((p) =>
-      `<label data-name="${esc(p.name.toLowerCase())}"><input type="checkbox" value="${esc(p.id)}" ${sel.has(p.id) ? 'checked' : ''}>${esc(p.name)}<code>${esc(p.id)}</code></label>`).join('')
-      : '<p class="empty">No active products found in this Stripe account.</p>';
-  } catch (e) { $('dlgbody').innerHTML = `<p class="error">${esc(e.message)}</p>`; }
+    $('dlgbody').innerHTML = body.products.length ? body.products.map((p) =>
+      `<label data-name="${esc(p.name.toLowerCase())}"><input type="checkbox" value="${esc(p.id)}" ${sel.has(p.id) ? 'checked' : ''}><span class="avatar" style="width:26px;height:26px;font-size:11px">${esc(initials(p.name))}</span>${esc(p.name)}<code>${esc(p.id)}</code></label>`).join('')
+      : '<p class="state">No active products found in this Stripe account.</p>';
+  } catch (e) { $('dlgbody').innerHTML = `<p class="state error">${esc(e.message)}</p>`; }
 });
 $('dlgq').addEventListener('input', (e) => {
   const q = e.target.value.toLowerCase();
@@ -246,8 +1330,102 @@ $('dlgsave').addEventListener('click', async () => {
   $('dlg').close(); load(true);
 });
 
+// ----- Money Master -----
+let mmConfig = null, mmPlan = null, mmBusy = false, mmShown = 100;
+function mmMessage(message, kind = '') {
+  $('mmMessage').hidden = !message;
+  $('mmMessage').className = kind;
+  $('mmMessage').textContent = message;
+}
+function mmControls(busy) {
+  mmBusy = busy;
+  $('mmPreviewButton').disabled = busy || !mmConfig;
+  $('mmSync').disabled = busy || !mmPlan?.connected || !mmPlan.entries.some((e) => ['ready', 'restore', 'update', 'rebuild'].includes(e.status));
+  $('mmClose').disabled = busy;
+  $('mmMappings').querySelectorAll('select').forEach((select) => { select.disabled = busy; });
+  $('mmDialog').setAttribute('aria-busy', String(busy));
+}
+async function mmApi(path, body) {
+  const response = await fetch(`/api/money-master${path}`, body === undefined ? {} : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (response.status === 401) { location.assign('/login'); throw new Error('Sign in again.'); }
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || 'Money Master request failed.');
+  return result;
+}
+function mmMappings(products) {
+  const income = mmConfig.ledgers.filter((ledger) => ledger.role === 'income');
+  $('mmMappings').innerHTML = products.length ? products.map((product) => {
+    const selected = product.ledger_id || product.suggested_ledger_id;
+    return `<label><span>${esc(product.name)}</span><select data-product="${esc(product.key)}" aria-label="Income ledger for ${esc(product.name)}"><option value="">Choose an income ledger…</option>${income.map((ledger) => `<option value="${ledger.id}" ${ledger.id === selected ? 'selected' : ''}>${esc(ledger.name)}</option>`).join('')}</select></label>`;
+  }).join('') : '<p class="report-note">No successful Sentink payments found.</p>';
+}
+function mmJournalTable(lines, currency, caption) {
+  return `<table><caption style="text-align:left;padding:10px 12px">${esc(caption)}</caption><thead><tr><th>Ledger</th><th class="r">Debit</th><th class="r">Credit</th></tr></thead><tbody>${lines.map((line) => `<tr><td>${esc(line.name || mmConfig.ledgers.find((ledger) => ledger.id === line.ledger_id)?.name || String(line.ledger_id))}</td><td class="r">${line.debit ? fmtMoney(line.debit, currency) : '—'}</td><td class="r">${line.credit ? fmtMoney(line.credit, currency) : '—'}</td></tr>`).join('')}</tbody></table>`;
+}
+function mmRenderPlan() {
+  const plan = mmPlan;
+  const ready = plan.entries.filter((e) => ['ready', 'restore', 'update', 'rebuild'].includes(e.status));
+  const restores = plan.entries.filter((e) => e.status === 'restore' || (e.status === 'update' && e.restore_deleted)).length;
+  const updates = plan.entries.filter((e) => e.status === 'update' && !e.restore_deleted).length;
+  const rebuilds = plan.entries.filter((e) => e.status === 'rebuild').length;
+  const synced = plan.entries.filter((e) => e.status === 'synced').length;
+  const conflicts = plan.entries.filter((e) => e.status === 'conflict');
+  const bank = ready.filter((e) => e.type === 'payout').flatMap((e) => e.lines).filter((l) => l.ledger_id === 31758060).reduce((sum, l) => sum + l.debit - l.credit, 0);
+  const fees = ready.filter((e) => e.type === 'payout').flatMap((e) => e.lines).filter((l) => l.ledger_id === 31758096).reduce((sum, l) => sum + l.debit - l.credit, 0);
+  const issues = [...plan.issues, ...conflicts.map((e) => ({ id: e.source_id, message: 'A previous journal or its dependency changed. Review it in Money Master; it will not be overwritten.' }))];
+  const displayEntries = [...plan.entries.filter((e) => e.type === 'payout'), ...plan.entries.filter((e) => e.type === 'refund'), ...plan.entries.filter((e) => e.type === 'payment')];
+  $('mmPreview').innerHTML = `<h3>Journal preview · ${esc(plan.currency.toUpperCase())}</h3>
+    <div class="report-sum"><div><div class="l">Ready entries</div><div class="v">${ready.length}</div></div><div><div class="l">Already synced</div><div class="v">${synced}</div></div><div><div class="l">Sentink bank amount in sync</div><div class="v">${fmtMoney(bank, plan.currency)}</div></div><div><div class="l">Stripe share in sync</div><div class="v">${fmtMoney(fees, plan.currency)}</div></div></div>
+    <p class="callout">New and restored entries will be Pending for review in Money Master. Successful refunds create opposite income/receivable lines, with any exchange difference in Stripe share.</p>
+    ${restores ? `<p class="callout">${restores} fully deleted journals will be restored as Pending using their original records. Their amounts and ledger assignments match the previous sync.</p>` : ''}
+    ${updates ? `<p class="callout">${updates} existing journals will receive the customer memo and return to Pending. Their amounts, ledgers and posting dates will stay the same.</p>` : ''}
+    ${rebuilds ? `<p class="callout">${rebuilds} fully deleted legacy refunds will be recreated as Pending to reverse the original income exactly. Their cash refund is unchanged; the old deleted records stay in the archive. Expand each entry to compare both versions.</p>` : ''}
+    ${issues.length ? `<details open><summary>${issues.length} items need review and will be skipped</summary><ul class="mm-issues">${issues.map((i) => `<li><b>${esc(i.id)}</b>: ${esc(i.message)}</li>`).join('')}</ul></details>` : ''}
+    <p class="report-note">${plan.entries.filter((e) => e.type === 'payout').length} paid payouts below include Wio Bank, Stripe share and receivables. Payouts are shown first. ${plan.skipped.length} unsuccessful payments or unpaid payouts skipped. Preview expires in 10 minutes.</p>
+    ${displayEntries.slice(0, mmShown).map((entry) => `<details class="mm-entry"><summary>${esc(entry.date)} · ${esc(entry.type)} · <b>${entry.status === 'synced' ? 'Already synced' : entry.status === 'conflict' ? 'Needs review' : entry.status === 'restore' ? 'Restore as pending' : entry.status === 'update' ? entry.restore_deleted ? 'Restore with memo · Pending' : 'Update memo · Pending' : entry.status === 'rebuild' ? 'Recreate corrected refund · Pending' : plan.connected ? 'Ready · Pending' : 'Preview only'}</b> · ${esc(entry.source_id)}</summary><small class="mm-source">${esc(entry.reason)}</small>${mmJournalTable(entry.lines, entry.currency, 'Journal')}${entry.previous_lines ? mmJournalTable(entry.previous_lines, entry.currency, 'Previously deleted refund — kept in the archive') : ''}</details>`).join('')}
+    ${plan.entries.length > mmShown ? '<button id="mmMore" class="icon-btn">Show 100 more entries</button>' : ''}`;
+  $('mmMore')?.addEventListener('click', () => { mmShown += 100; mmRenderPlan(); });
+  $('mmSync').textContent = `Sync ${ready.length} ready entries`;
+}
+$('mmOpen').addEventListener('click', async () => {
+  mmConfig = null; mmPlan = null;
+  $('mmMappings').innerHTML = ''; $('mmPreview').innerHTML = '';
+  $('mmDialog').showModal(); mmControls(true); mmMessage('Loading product mappings…');
+  try {
+    mmConfig = await mmApi(''); mmMappings(mmConfig.products);
+    $('mmPolicy').textContent = `Subscription invoices debit the plan receivable and credit income. The payout debits Wio Bank and credits that receivable. Other payments debit Stripe receivables and credit income. Refunds reverse the original income. Imported entries stay Pending. Settlement currency: ${(mmConfig.currency || 'aed').toUpperCase()}.`;
+    mmMessage(mmConfig.configured ? 'Review the income ledgers, then create a preview.' : 'Money Master connection needs setup. You can save mappings and preview; posting is disabled until connected.');
+  } catch (error) { mmMessage(error.message, 'error'); }
+  finally { mmControls(false); }
+});
+$('mmMappings').addEventListener('change', () => { mmPlan = null; $('mmPreview').innerHTML = ''; mmMessage('Mapping changed. Save and preview before syncing.'); mmControls(false); });
+$('mmPreviewButton').addEventListener('click', async () => {
+  mmPlan = null; mmControls(true); mmMessage('Reading the complete Stripe history and reconciling paid payouts…');
+  try {
+    const mappings = Object.fromEntries([...$('mmMappings').querySelectorAll('select')].filter((s) => s.value).map((s) => [s.dataset.product, Number(s.value)]));
+    await mmApi('/mappings', mappings);
+    mmPlan = await mmApi('/preview', {}); mmShown = 100;
+    mmMappings(mmPlan.products); mmRenderPlan();
+    mmMessage(mmPlan.connected ? 'Preview ready. Only ready entries will be posted; completed entries are skipped.' : mmPlan.connection_error, mmPlan.connected ? '' : 'error');
+  } catch (error) { mmMessage(error.message, 'error'); }
+  finally { mmControls(false); }
+});
+$('mmSync').addEventListener('click', async () => {
+  if (!mmPlan?.connected || mmBusy) return;
+  const token = mmPlan.token; mmPlan = null; mmControls(true); mmMessage('Posting balanced journals to Money Master…');
+  try {
+    const result = await mmApi('/sync', { token });
+    $('mmPreview').innerHTML = '';
+    mmMessage(`Sync complete. ${result.posted} entries imported as Pending; ${result.restored || 0} restored as Pending; ${result.updated || 0} memos updated and set Pending; ${result.rebuilt || 0} deleted refunds recreated; ${result.already_synced} entries were already synced. Review Pending journals in Money Master.`, 'success');
+  } catch (error) { $('mmPreview').innerHTML = ''; mmMessage(error.message, 'error'); }
+  finally { mmControls(false); }
+});
+$('mmClose').addEventListener('click', () => $('mmDialog').close());
+$('mmDialog').addEventListener('cancel', (event) => { if (mmBusy) event.preventDefault(); });
+
 load();
-timer = setInterval(() => load(), 60_000);
+setInterval(() => load(), 60_000);
+if (/^#pi_[A-Za-z0-9]+$/.test(location.hash)) openDetail(location.hash.slice(1));
 </script>
 </body>
 </html>
