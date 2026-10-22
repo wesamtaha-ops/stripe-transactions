@@ -5,6 +5,7 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const moneyMaster = require('./money-master');
 
 const ROOT = __dirname;
 loadEnv(path.join(ROOT, '.env'));
@@ -24,6 +25,15 @@ const CACHE_MS = 60_000;
 const MAX_PAGES = 10; // 100 objects per page per source
 
 const cache = new Map(); // key -> { at, data }
+const MM_MAPPINGS = path.join(ROOT, 'money-master-mappings.json');
+const MM_USER = process.env.MONEY_MASTER_USER || 'sentink';
+const MM_CURRENCY = (process.env.MONEY_MASTER_CURRENCY || 'aed').toLowerCase();
+if (!/^[a-z]{3}$/.test(MM_CURRENCY) || new Intl.NumberFormat('en', { style: 'currency', currency: MM_CURRENCY }).resolvedOptions().maximumFractionDigits !== 2) {
+  throw new Error('MONEY_MASTER_CURRENCY must be a two-decimal accounting currency, such as AED.');
+}
+const mmClient = moneyMaster.createClient({ url: process.env.MONEY_MASTER_SYNC_URL, token: process.env.MONEY_MASTER_SYNC_TOKEN });
+const mmPreviews = new Map();
+let mmRunning = false;
 
 // ---------- helpers ----------
 
@@ -72,7 +82,7 @@ function scopeFor(user, data) {
     ...data,
     rows: data.rows.filter((r) => visible(user, r.product_names)),
     tracked: data.tracked.filter((p) => visible(user, [p.name])),
-    user: { name: user.name, scope: user.scope && `${user.scope.mode === 'only' ? 'Only' : 'Excluding'} ${user.scope.label}` },
+    user: { name: user.name, scope: user.scope && `${user.scope.mode === 'only' ? 'Only' : 'Excluding'} ${user.scope.label}`, money_master: user.name === MM_USER },
   };
 }
 
@@ -107,15 +117,17 @@ async function stripe(pathname, params = {}) {
   return body;
 }
 
-async function listAll(pathname, params) {
+async function listAll(pathname, params, strict = false) {
   const out = [];
   let starting_after;
-  for (let page = 0; page < MAX_PAGES; page++) {
+  for (let page = 0; page < (strict ? 10000 : MAX_PAGES); page++) {
     const res = await stripe(pathname, { limit: 100, ...params, starting_after });
     out.push(...res.data);
-    if (!res.has_more || !res.data.length) break;
+    if (!res.has_more) return out;
+    if (!res.data.length) throw new Error(`Stripe returned an incomplete page for ${pathname}`);
     starting_after = res.data[res.data.length - 1].id;
   }
+  if (strict) throw new Error(`Stripe pagination limit reached for ${pathname}; no sync can be posted.`);
   return out;
 }
 
@@ -165,10 +177,10 @@ function refundStatus(charge) {
 }
 
 // range: { from, to } in unix seconds (either may be missing); {} = all time.
-async function getTransactions(range, force) {
+async function getTransactions(range, force, strict = false) {
   const from = range.from || 0, to = range.to || null;
   const productIds = readProducts();
-  const key = `${from}-${to || ''}|${productIds.join(',')}`;
+  const key = `${from}-${to || ''}|${productIds.join(',')}|${strict}`;
   const hit = cache.get(key);
   if (!force && hit && Date.now() - hit.at < CACHE_MS) return hit.data;
 
@@ -176,14 +188,22 @@ async function getTransactions(range, force) {
   const since = from;
   const created = (extra) => ({ 'created[gte]': since, ...(to ? { 'created[lt]': to } : {}), ...extra });
 
+  const list = (url, params) => listAll(url, params, strict);
   const [sessions, invoices, charges, refunds, intents, products] = await Promise.all([
-    listAll('/v1/checkout/sessions', created({ status: 'complete', 'expand[]': ['data.line_items'] })),
-    listAll('/v1/invoices', created({ 'expand[]': ['data.payments'] })),
-    listAll('/v1/charges', created({ 'expand[]': ['data.balance_transaction'] })),
-    listAll('/v1/refunds', created({ 'expand[]': ['data.balance_transaction'] })),
-    listAll('/v1/payment_intents', created({})),
-    listAll('/v1/products', {}),
+    list('/v1/checkout/sessions', created({ status: 'complete', 'expand[]': ['data.line_items'] })),
+    list('/v1/invoices', created({ 'expand[]': ['data.payments'] })),
+    list('/v1/charges', created({ 'expand[]': ['data.balance_transaction'] })),
+    list('/v1/refunds', created({ 'expand[]': ['data.balance_transaction'] })),
+    list('/v1/payment_intents', created({})),
+    list('/v1/products', {}),
   ]);
+  if (strict) {
+    for (const session of sessions) if (session.line_items?.has_more) session.line_items.data = await list(`/v1/checkout/sessions/${session.id}/line_items`, {});
+    for (const invoice of invoices) {
+      if (invoice.lines?.has_more) invoice.lines.data = await list(`/v1/invoices/${invoice.id}/lines`, {});
+      if (invoice.payments?.has_more || (invoice.payments?.data || []).filter((p) => p.payment?.payment_intent).length > 1) throw new Error(`Invoice ${invoice.id} has multiple payments and requires manual review.`);
+    }
+  }
 
   // Products created inline at checkout (e.g. "Balance Top-Up") aren't in the catalog,
   // so fall back to the line item description for their name.
@@ -208,6 +228,9 @@ async function getTransactions(range, force) {
     row.payment_intent = pi || null;
     row.status = refundStatus(charge) || row.status;
     row.refunded_amount = charge?.amount_refunded || 0;
+    row.customer_name = row.customer_name || charge?.billing_details?.name || '';
+    row.customer_email = row.customer_email || charge?.billing_details?.email || charge?.receipt_email || '';
+    row.customer_id = row.customer_id || idOf(charge?.customer) || null;
     row.tracked = tracked.has(row.product_id);
     rows.push(row);
     if (pi) rowsByPI.set(pi, [...(rowsByPI.get(pi) || []), row]);
@@ -229,6 +252,9 @@ async function getTransactions(range, force) {
         amount: li.amount_total,
         currency: li.currency || s.currency,
         customer: s.customer_details?.email || s.customer_details?.name || '—',
+        customer_name: s.customer_details?.name || '',
+        customer_email: s.customer_details?.email || s.customer_email || '',
+        customer_id: idOf(s.customer) || null,
         status: s.payment_status,
         source: s.payment_link ? 'Payment Link' : 'Checkout',
         url: pi ? dashLink('payments', pi) : dashLink('checkout/sessions', s.id),
@@ -254,6 +280,9 @@ async function getTransactions(range, force) {
         amount: paid[i],
         currency: li.currency || inv.currency,
         customer: inv.customer_email || inv.customer_name || '—',
+        customer_name: inv.customer_name || '',
+        customer_email: inv.customer_email || '',
+        customer_id: idOf(inv.customer) || null,
         status: 'paid',
         source: inv.subscription || inv.parent?.subscription_details ? 'Subscription' : 'Invoice',
         invoice: inv.id,
@@ -271,6 +300,7 @@ async function getTransactions(range, force) {
         product_id: productOf(li),
         product: names[productOf(li)] || li.description,
         customer: inv.customer_email || inv.customer_name || '—',
+        customer_name: inv.customer_name || '', customer_email: inv.customer_email || '', customer_id: idOf(inv.customer) || null,
       }));
     }
     const found = await stripe('/v1/checkout/sessions', { payment_intent: pi, 'expand[]': ['data.line_items'] })
@@ -279,6 +309,7 @@ async function getTransactions(range, force) {
       product_id: productOf(li),
       product: names[productOf(li)] || li.description,
       customer: found.customer_details?.email || found.customer_details?.name || '—',
+      customer_name: found.customer_details?.name || '', customer_email: found.customer_details?.email || found.customer_email || '', customer_id: idOf(found.customer) || null,
     }));
   };
 
@@ -299,6 +330,9 @@ async function getTransactions(range, force) {
       amount: p.amount_received || p.amount,
       currency: p.currency,
       customer: first.customer || p.receipt_email || '—',
+      customer_name: first.customer_name || '',
+      customer_email: first.customer_email || p.receipt_email || '',
+      customer_id: first.customer_id || idOf(p.customer) || null,
       status: ok ? 'paid' : p.status === 'canceled' ? 'canceled' : 'failed',
       source: invoiceByPI.has(p.id) ? 'Subscription' : 'Payment',
       url: dashLink('payments', p.id),
@@ -331,6 +365,8 @@ async function getTransactions(range, force) {
       amount: -r.amount,
       currency: r.currency,
       customer: first.customer || '—',
+      customer_name: first.customer_name || '', customer_email: first.customer_email || '', customer_id: first.customer_id || idOf(r.customer) || null,
+      original_charge: idOf(r.charge) || null,
       status: r.status === 'succeeded' ? 'refund' : `refund ${r.status}`,
       source: 'Refund',
       tracked: originals.some((o) => tracked.has(o.product_id)),
@@ -351,6 +387,17 @@ async function getTransactions(range, force) {
     const gross = splitPaid(bt.amount, weights), fee = splitPaid(bt.fee, weights), net = splitPaid(bt.net, weights);
     const chargeId = chargeByPI.get(pi).id;
     list.forEach((r, i) => Object.assign(r, settlement(bt, { gross: gross[i], fee: fee[i], net: net[i] }), { source_id: chargeId }));
+  }
+
+  // Transaction snapshots take priority; use Customer details only to fill a
+  // missing name/email. Cache each lookup for this complete-history read.
+  const customerCache = new Map();
+  if (strict) for (const row of rows) {
+    if (!row.customer_id || (row.customer_name && row.customer_email)) continue;
+    if (!customerCache.has(row.customer_id)) customerCache.set(row.customer_id, await stripe(`/v1/customers/${encodeURIComponent(row.customer_id)}`).catch(() => null));
+    const customer = customerCache.get(row.customer_id);
+    row.customer_name = row.customer_name || customer?.name || '';
+    row.customer_email = row.customer_email || customer?.email || '';
   }
 
   rows.sort((a, b) => b.created - a.created);
@@ -404,19 +451,24 @@ const PAYOUTS_MS = 10 * 60 * 1000;
 let payoutCache = { at: 0, data: null };
 
 // Every payout with the balance transactions it contained, plus the balance and schedule.
-async function getPayoutData(force) {
-  if (!force && payoutCache.data && Date.now() - payoutCache.at < PAYOUTS_MS) return payoutCache.data;
+async function getPayoutData(force, strict = false) {
+  if (!strict && !force && payoutCache.data && Date.now() - payoutCache.at < PAYOUTS_MS) return payoutCache.data;
   const [payouts, balance, settings] = await Promise.all([
-    listAll('/v1/payouts', { 'expand[]': ['data.destination'] }),
+    listAll('/v1/payouts', { 'expand[]': ['data.destination'] }, strict),
     stripe('/v1/balance'),
     stripe('/v1/account').then((a) => a.settings?.payouts?.schedule || null).catch(() => null),
   ]);
   const sourceToPayout = {};
   const contents = {}; // payout id -> balance transactions in it
-  await Promise.all(payouts.filter((p) => p.automatic && p.status !== 'failed' && p.status !== 'canceled').map(async (p) => {
-    const txns = await listAll('/v1/balance_transactions', { payout: p.id });
+  const queue = payouts.filter((p) => p.automatic && p.status !== 'failed' && p.status !== 'canceled');
+  const loadPayout = async (p) => {
+    const txns = await listAll('/v1/balance_transactions', { payout: p.id }, strict);
     contents[p.id] = txns.filter((t) => t.type !== 'payout');
     for (const t of contents[p.id]) if (t.source) sourceToPayout[idOf(t.source)] = p.id;
+  };
+  let cursor = 0;
+  await Promise.all(Array.from({ length: Math.min(5, queue.length) }, async () => {
+    while (cursor < queue.length) await loadPayout(queue[cursor++]);
   }));
   const data = { payouts, balance, schedule: settings, sourceToPayout, contents };
   payoutCache = { at: Date.now(), data };
@@ -790,6 +842,96 @@ function readBody(req) {
   });
 }
 
+function mmMappings() {
+  if (!fs.existsSync(MM_MAPPINGS)) return {};
+  const mappings = JSON.parse(fs.readFileSync(MM_MAPPINGS, 'utf8'));
+  if (!mappings || Array.isArray(mappings) || typeof mappings !== 'object') throw new Error('Invalid Money Master mappings file');
+  return mappings;
+}
+
+function mmRows(user, transactions) {
+  // Login center 12 was explicitly limited to Sentink, even if this dashboard
+  // user's scope is later widened in the hosting panel.
+  return scopeFor(user, transactions).rows.filter((row) => !row.product_names.some((name) => String(name || '').toLowerCase().startsWith('sentink plus')));
+}
+
+async function handleMoneyMaster(req, res, url, user) {
+  if (user.name !== MM_USER) return send(res, 403, { error: 'Money Master sync is available to the configured Sentink user only.' });
+  if (req.method === 'POST' && (!req.headers['content-type']?.startsWith('application/json') || (req.headers.origin && req.headers.origin !== url.origin))) {
+    return send(res, 403, { error: 'Use the sync controls in this dashboard.' });
+  }
+  if (url.pathname === '/api/money-master' && req.method === 'GET') {
+    const mappings = mmMappings();
+    const data = scopeFor(user, await getTransactions({}, false, true));
+    return send(res, 200, { configured: mmClient.configured, login_center: 12, currency: MM_CURRENCY,
+      ledgers: moneyMaster.LEDGERS, products: moneyMaster.productsFor(mmRows(user, data), mappings), scope: 'Excluding Sentink Plus' });
+  }
+  if (mmRunning) return send(res, 409, { error: 'A sync is already running. Preview again when it finishes.' });
+  if (url.pathname === '/api/money-master/mappings' && req.method === 'POST') {
+    const mappings = JSON.parse(await readBody(req));
+    if (!mappings || Array.isArray(mappings) || typeof mappings !== 'object' || Object.entries(mappings).some(([k, v]) => !k || k.length > 300 || !moneyMaster.incomeIds.has(v))) {
+      return send(res, 400, { error: 'Choose a valid income ledger for each mapped product.' });
+    }
+    const current = mmMappings();
+    const allowed = new Set(moneyMaster.productsFor(mmRows(user, await getTransactions({}, false, true)), current).map((p) => p.key));
+    if (Object.keys(mappings).some((k) => !allowed.has(k))) return send(res, 403, { error: 'Product is outside your visible Stripe payments.' });
+    for (const key of allowed) delete current[key];
+    Object.assign(current, mappings);
+    const temporary = `${MM_MAPPINGS}.tmp`;
+    fs.writeFileSync(temporary, JSON.stringify(current, null, 2) + '\n', { mode: 0o600 });
+    fs.renameSync(temporary, MM_MAPPINGS);
+    mmPreviews.delete(user.name);
+    return send(res, 200, { ok: true });
+  }
+  if (url.pathname === '/api/money-master/preview' && req.method === 'POST') {
+    const [transactions, pd, account] = await Promise.all([getTransactions({}, true, true), getPayoutData(true, true), stripe('/v1/account')]);
+    const visibleRows = mmRows(user, transactions);
+    const mappings = mmMappings();
+    const scopeKey = 'sentink'; // Stable across display-name/user-scope changes.
+    let plan = moneyMaster.buildPlan({ allRows: transactions.rows, visibleRows, payouts: pd.payouts,
+      contents: pd.contents, mappings, account: account.id, mode: transactions.mode, currency: MM_CURRENCY, scopeKey });
+    let connectionError = null, connected = false;
+    try {
+      const remote = await mmClient.request('GET');
+      if (remote.journal_version !== moneyMaster.JOURNAL_VERSION || remote.pending_entries !== true) throw new Error('Update Money Master stripe_sync.php before syncing. The installed bridge does not support pending journals and customer memos.');
+      if (remote.login_center !== 12 || remote.currency !== MM_CURRENCY) throw new Error('Money Master login center or currency does not match this sync.');
+      if (transactions.mode === 'test' && !remote.allow_test) throw new Error('Stripe is in test mode. The Money Master bridge accepts live payments only.');
+      for (const ledger of moneyMaster.LEDGERS) {
+        if (!remote.ledgers.some((l) => Number(l.id) === ledger.id && Number(l.account_id) === ledger.account_id)) throw new Error(`Money Master ledger missing or changed: ${ledger.name}.`);
+      }
+      plan = moneyMaster.annotate(plan, remote.receipts);
+      connected = true;
+    } catch (error) { connectionError = error.message; plan = moneyMaster.annotate(plan, []); }
+    const token = crypto.randomBytes(32).toString('hex');
+    const expires = Date.now() + 10 * 60 * 1000;
+    mmPreviews.set(user.name, { token, expires, plan, connected });
+    return send(res, 200, { ...plan, token, expires, connected, connection_error: connectionError,
+      login_center: 12, currency: MM_CURRENCY, scope: scopeFor(user, transactions).user.scope,
+      products: moneyMaster.productsFor(visibleRows, mappings) });
+  }
+  if (url.pathname === '/api/money-master/sync' && req.method === 'POST') {
+    const { token } = JSON.parse(await readBody(req));
+    const preview = mmPreviews.get(user.name);
+    if (!preview || token !== preview.token || preview.expires <= Date.now()) return send(res, 409, { error: 'The preview expired or changed. Create a new preview.' });
+    if (!preview.connected) return send(res, 409, { error: 'Connect Money Master and create a new preview before syncing.' });
+    mmPreviews.delete(user.name);
+    mmRunning = true;
+    let posted = 0, alreadySynced = 0, restored = 0, updated = 0, rebuilt = 0;
+    try {
+      // Stable dependency order: payments first, refunds next, then payouts.
+      for (const item of preview.plan.entries.filter((e) => ['ready', 'restore', 'update', 'rebuild'].includes(e.status))) {
+        const { hash, status, upgrade_metadata, restore_deleted, rebuild_deleted, previous_lines, ...entry } = item;
+        const result = await mmClient.request('POST', { payload: JSON.stringify(entry), ...(status === 'restore' || restore_deleted ? { restore_deleted: true } : {}), ...(upgrade_metadata ? { upgrade_metadata: true } : {}), ...(rebuild_deleted ? { rebuild_deleted: true } : {}) });
+        if (result.status === 'synced') alreadySynced++; else if (result.status === 'restored') restored++; else if (result.status === 'updated') updated++; else if (result.status === 'rebuilt') rebuilt++; else posted++;
+      }
+      return send(res, 200, { ok: true, posted, restored, updated, rebuilt, already_synced: alreadySynced });
+    } catch (error) {
+      return send(res, 502, { error: `${error.message} ${posted} entries were imported, ${restored} restored, ${updated} updated and ${rebuilt} deleted refunds recreated. Preview again to safely resume; completed entries will be skipped.`, posted, restored, updated, rebuilt });
+    } finally { mmRunning = false; }
+  }
+  return send(res, 404, { error: 'Not found' });
+}
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   try {
@@ -829,6 +971,7 @@ const server = http.createServer(async (req, res) => {
     if (!STRIPE_KEY && url.pathname.startsWith('/api/')) {
       return send(res, 500, { error: 'STRIPE_SECRET_KEY is not set. Copy .env.example to .env and add your key.' });
     }
+    if (url.pathname.startsWith('/api/money-master')) return await handleMoneyMaster(req, res, url, user);
     if (url.pathname === '/api/transactions' && req.method === 'GET') {
       // from/to are unix seconds computed by the browser in the viewer's timezone; none = all time.
       const num = (k) => { const v = Number(url.searchParams.get(k)); return Number.isInteger(v) && v > 0 ? v : null; };
@@ -892,7 +1035,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, HOST, () => {
-  console.log(`Dashboard running at http://localhost:${PORT}`);
+  console.log(`Dashboard running at http://${HOST}:${server.address().port}`);
   for (const u of USERS) {
     console.log(`  user "${u.name}": ${u.scope ? `${u.scope.mode === 'only' ? 'only' : 'everything except'} products starting with "${u.scope.label}"` : 'all products'}`);
   }

@@ -1,2 +1,5 @@
 .env
 node_modules/
+money-master-mappings.json
+money-master-mappings.json.tmp
+money-master-deploy/

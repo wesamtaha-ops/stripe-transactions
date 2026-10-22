@@ -407,6 +407,40 @@
     .po-table tr.po-items td { display: block; padding: 6px 4px 10px 16px !important; }
   }
   .time-inline { display: none; color: var(--muted); }
+  .page-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  #mmDialog { width: min(980px, calc(100vw - 24px)); max-width: 980px; padding: 0; }
+  #mmDialog[open] { display: flex; flex-direction: column; max-height: 90vh; }
+  #mmDialog .dlg-head, #mmDialog .dlg-foot { flex-shrink: 0; }
+  #mmOpen[hidden] { display: none; }
+  #mmDialog .dlg-head p { max-width: 75ch; }
+  .mm-body { padding: 0 24px 20px; overflow: auto; min-height: 0; }
+  .mm-body h3 { font-size: 15px; margin: 22px 0 8px; }
+  .mm-mappings { display: grid; gap: 10px; margin: 14px 0; }
+  .mm-mappings label { display: grid; grid-template-columns: minmax(160px, 1fr) minmax(200px, 1fr); gap: 12px; align-items: center; }
+  .mm-mappings select { padding: 9px; min-width: 0; max-width: 100%; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface); }
+  #mmMessage { margin: 0 24px 16px; padding: 12px; border-radius: 8px; background: var(--neutral-soft); white-space: pre-wrap; }
+  #mmMessage.error { color: var(--err); background: var(--err-soft); }
+  #mmMessage.success { color: var(--ok); background: var(--ok-soft); }
+  .mm-entry { border: 1px solid var(--border); border-radius: 10px; margin: 8px 0; overflow: hidden; }
+  .mm-entry summary { cursor: pointer; padding: 12px; overflow-wrap: anywhere; }
+  .mm-entry table { table-layout: fixed; }
+  .mm-entry td, .mm-entry th { white-space: normal; padding: 10px 12px; overflow-wrap: anywhere; }
+  .mm-entry th:first-child { width: 54%; }
+  .mm-source { display: block; margin: 6px 12px; color: var(--muted); overflow-wrap: anywhere; }
+  .mm-issues { padding-left: 20px; color: var(--warn); overflow-wrap: anywhere; }
+  #mmDialog .dlg-foot { flex-wrap: wrap; }
+  #mmDialog button:disabled { opacity: .5; cursor: default; }
+  #mmDialog :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  @media (max-width: 600px) {
+    .mm-body { padding: 0 14px 16px; }
+    .mm-mappings label { grid-template-columns: 1fr; gap: 4px; }
+    #mmDialog .report-sum { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    #mmDialog .dlg-foot { display: grid; grid-template-columns: minmax(70px, 1fr) minmax(0, 2fr); padding: 12px 14px; gap: 8px; }
+    #mmDialog .dlg-foot .spacer { display: none; }
+    #mmDialog .dlg-foot button { min-height: 42px; height: auto; padding: 10px 12px; line-height: 1.3; justify-content: center; }
+    #mmPreviewButton { grid-column: 1 / -1; grid-row: 1; }
+    #mmClose, #mmSync { grid-row: 2; }
+  }
 </style>
 </head>
 <body>
@@ -437,10 +471,13 @@
       <h1>Transactions</h1>
       <p class="sub" id="sub">Payments, top-ups and refunds across your Stripe account.</p>
     </div>
+    <div class="page-actions">
+    <button id="mmOpen" class="icon-btn" hidden>Sync with Money Master</button>
     <button id="manage" class="btn-primary">
       <svg class="i" viewBox="0 0 24 24"><path d="M12 3 2 8l10 5 10-5-10-5Z"/><path d="m2 16 10 5 10-5"/><path d="m2 12 10 5 10-5"/></svg>
       Tracked products
     </button>
+    </div>
   </div>
 
   <div class="toolbar">
@@ -570,6 +607,27 @@
   <div class="dlg-foot"><button id="dlgcancel" class="icon-btn">Cancel</button><button id="dlgsave" class="btn-primary">Save</button></div>
 </dialog>
 
+<dialog id="mmDialog" aria-labelledby="mmTitle" aria-describedby="mmDescription">
+  <div class="dlg-head">
+    <h2 id="mmTitle">Sync with Money Master</h2>
+    <p id="mmDescription">Sentink → login center 12. Sentink Plus is excluded. This sync includes all history, regardless of dashboard filters.</p>
+  </div>
+  <p id="mmMessage" role="status" aria-live="polite" hidden></p>
+  <div class="mm-body">
+    <p id="mmPolicy" class="report-note">Payments → Stripe receivables + income. Refunds reverse the original income. Paid payouts → Wio Bank + Stripe fees. All imported entries are Pending.</p>
+    <h3>Product income ledgers</h3>
+    <p class="report-note">Review the suggested ledgers. Saving and previewing confirms these assignments.</p>
+    <div id="mmMappings" class="mm-mappings"></div>
+    <div id="mmPreview"></div>
+  </div>
+  <div class="dlg-foot">
+    <button id="mmClose" class="icon-btn">Close</button>
+    <span class="spacer"></span>
+    <button id="mmPreviewButton" class="icon-btn" disabled>Save mappings &amp; preview</button>
+    <button id="mmSync" class="btn-primary" disabled>Sync ready entries</button>
+  </div>
+</dialog>
+
 <script>
 const $ = (id) => document.getElementById(id);
 let data = null;
@@ -691,6 +749,7 @@ async function load(refresh = false) {
 // ---------- render ----------
 
 function render() {
+  $('mmOpen').hidden = !data.user?.money_master;
   const mode = $('mode');
   mode.hidden = false; mode.className = `mode ${data.mode}`; mode.textContent = data.mode === 'test' ? 'Test mode' : 'Live';
   if (data.user) {
@@ -1270,6 +1329,99 @@ $('dlgsave').addEventListener('click', async () => {
   if (!res.ok) return alert((await res.json()).error);
   $('dlg').close(); load(true);
 });
+
+// ----- Money Master -----
+let mmConfig = null, mmPlan = null, mmBusy = false, mmShown = 100;
+function mmMessage(message, kind = '') {
+  $('mmMessage').hidden = !message;
+  $('mmMessage').className = kind;
+  $('mmMessage').textContent = message;
+}
+function mmControls(busy) {
+  mmBusy = busy;
+  $('mmPreviewButton').disabled = busy || !mmConfig;
+  $('mmSync').disabled = busy || !mmPlan?.connected || !mmPlan.entries.some((e) => ['ready', 'restore', 'update', 'rebuild'].includes(e.status));
+  $('mmClose').disabled = busy;
+  $('mmMappings').querySelectorAll('select').forEach((select) => { select.disabled = busy; });
+  $('mmDialog').setAttribute('aria-busy', String(busy));
+}
+async function mmApi(path, body) {
+  const response = await fetch(`/api/money-master${path}`, body === undefined ? {} : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (response.status === 401) { location.assign('/login'); throw new Error('Sign in again.'); }
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || 'Money Master request failed.');
+  return result;
+}
+function mmMappings(products) {
+  const income = mmConfig.ledgers.filter((ledger) => ledger.role === 'income');
+  $('mmMappings').innerHTML = products.length ? products.map((product) => {
+    const selected = product.ledger_id || product.suggested_ledger_id;
+    return `<label><span>${esc(product.name)}</span><select data-product="${esc(product.key)}" aria-label="Income ledger for ${esc(product.name)}"><option value="">Choose an income ledger…</option>${income.map((ledger) => `<option value="${ledger.id}" ${ledger.id === selected ? 'selected' : ''}>${esc(ledger.name)}</option>`).join('')}</select></label>`;
+  }).join('') : '<p class="report-note">No successful Sentink payments found.</p>';
+}
+function mmJournalTable(lines, currency, caption) {
+  return `<table><caption style="text-align:left;padding:10px 12px">${esc(caption)}</caption><thead><tr><th>Ledger</th><th class="r">Debit</th><th class="r">Credit</th></tr></thead><tbody>${lines.map((line) => `<tr><td>${esc(line.name || mmConfig.ledgers.find((ledger) => ledger.id === line.ledger_id)?.name || String(line.ledger_id))}</td><td class="r">${line.debit ? fmtMoney(line.debit, currency) : '—'}</td><td class="r">${line.credit ? fmtMoney(line.credit, currency) : '—'}</td></tr>`).join('')}</tbody></table>`;
+}
+function mmRenderPlan() {
+  const plan = mmPlan;
+  const ready = plan.entries.filter((e) => ['ready', 'restore', 'update', 'rebuild'].includes(e.status));
+  const restores = plan.entries.filter((e) => e.status === 'restore' || (e.status === 'update' && e.restore_deleted)).length;
+  const updates = plan.entries.filter((e) => e.status === 'update' && !e.restore_deleted).length;
+  const rebuilds = plan.entries.filter((e) => e.status === 'rebuild').length;
+  const synced = plan.entries.filter((e) => e.status === 'synced').length;
+  const conflicts = plan.entries.filter((e) => e.status === 'conflict');
+  const bank = ready.filter((e) => e.type === 'payout').flatMap((e) => e.lines).filter((l) => l.ledger_id === 31758060).reduce((sum, l) => sum + l.debit - l.credit, 0);
+  const fees = ready.filter((e) => e.type === 'payout').flatMap((e) => e.lines).filter((l) => l.ledger_id === 31758096).reduce((sum, l) => sum + l.debit - l.credit, 0);
+  const issues = [...plan.issues, ...conflicts.map((e) => ({ id: e.source_id, message: 'A previous journal or its dependency changed. Review it in Money Master; it will not be overwritten.' }))];
+  const displayEntries = [...plan.entries.filter((e) => e.type === 'payout'), ...plan.entries.filter((e) => e.type === 'refund'), ...plan.entries.filter((e) => e.type === 'payment')];
+  $('mmPreview').innerHTML = `<h3>Journal preview · ${esc(plan.currency.toUpperCase())}</h3>
+    <div class="report-sum"><div><div class="l">Ready entries</div><div class="v">${ready.length}</div></div><div><div class="l">Already synced</div><div class="v">${synced}</div></div><div><div class="l">Sentink bank amount in sync</div><div class="v">${fmtMoney(bank, plan.currency)}</div></div><div><div class="l">Stripe share in sync</div><div class="v">${fmtMoney(fees, plan.currency)}</div></div></div>
+    <p class="callout">New and restored entries will be Pending for review in Money Master. Successful refunds create opposite income/receivable lines, with any exchange difference in Stripe share.</p>
+    ${restores ? `<p class="callout">${restores} fully deleted journals will be restored as Pending using their original records. Their amounts and ledger assignments match the previous sync.</p>` : ''}
+    ${updates ? `<p class="callout">${updates} existing journals will receive the customer memo and return to Pending. Their amounts, ledgers and posting dates will stay the same.</p>` : ''}
+    ${rebuilds ? `<p class="callout">${rebuilds} fully deleted legacy refunds will be recreated as Pending to reverse the original income exactly. Their cash refund is unchanged; the old deleted records stay in the archive. Expand each entry to compare both versions.</p>` : ''}
+    ${issues.length ? `<details open><summary>${issues.length} items need review and will be skipped</summary><ul class="mm-issues">${issues.map((i) => `<li><b>${esc(i.id)}</b>: ${esc(i.message)}</li>`).join('')}</ul></details>` : ''}
+    <p class="report-note">${plan.entries.filter((e) => e.type === 'payout').length} paid payouts below include Wio Bank, Stripe share and receivables. Payouts are shown first. ${plan.skipped.length} unsuccessful payments or unpaid payouts skipped. Preview expires in 10 minutes.</p>
+    ${displayEntries.slice(0, mmShown).map((entry) => `<details class="mm-entry"><summary>${esc(entry.date)} · ${esc(entry.type)} · <b>${entry.status === 'synced' ? 'Already synced' : entry.status === 'conflict' ? 'Needs review' : entry.status === 'restore' ? 'Restore as pending' : entry.status === 'update' ? entry.restore_deleted ? 'Restore with memo · Pending' : 'Update memo · Pending' : entry.status === 'rebuild' ? 'Recreate corrected refund · Pending' : plan.connected ? 'Ready · Pending' : 'Preview only'}</b> · ${esc(entry.source_id)}</summary><small class="mm-source">${esc(entry.reason)}</small>${mmJournalTable(entry.lines, entry.currency, 'Journal')}${entry.previous_lines ? mmJournalTable(entry.previous_lines, entry.currency, 'Previously deleted refund — kept in the archive') : ''}</details>`).join('')}
+    ${plan.entries.length > mmShown ? '<button id="mmMore" class="icon-btn">Show 100 more entries</button>' : ''}`;
+  $('mmMore')?.addEventListener('click', () => { mmShown += 100; mmRenderPlan(); });
+  $('mmSync').textContent = `Sync ${ready.length} ready entries`;
+}
+$('mmOpen').addEventListener('click', async () => {
+  mmConfig = null; mmPlan = null;
+  $('mmMappings').innerHTML = ''; $('mmPreview').innerHTML = '';
+  $('mmDialog').showModal(); mmControls(true); mmMessage('Loading product mappings…');
+  try {
+    mmConfig = await mmApi(''); mmMappings(mmConfig.products);
+    $('mmPolicy').textContent = `Payments → Stripe receivables + income. Refunds reverse the original income. Paid payouts → Wio Bank + Stripe fees. All imported entries are Pending. Settlement currency: ${(mmConfig.currency || 'aed').toUpperCase()}.`;
+    mmMessage(mmConfig.configured ? 'Review the income ledgers, then create a preview.' : 'Money Master connection needs setup. You can save mappings and preview; posting is disabled until connected.');
+  } catch (error) { mmMessage(error.message, 'error'); }
+  finally { mmControls(false); }
+});
+$('mmMappings').addEventListener('change', () => { mmPlan = null; $('mmPreview').innerHTML = ''; mmMessage('Mapping changed. Save and preview before syncing.'); mmControls(false); });
+$('mmPreviewButton').addEventListener('click', async () => {
+  mmPlan = null; mmControls(true); mmMessage('Reading the complete Stripe history and reconciling paid payouts…');
+  try {
+    const mappings = Object.fromEntries([...$('mmMappings').querySelectorAll('select')].filter((s) => s.value).map((s) => [s.dataset.product, Number(s.value)]));
+    await mmApi('/mappings', mappings);
+    mmPlan = await mmApi('/preview', {}); mmShown = 100;
+    mmMappings(mmPlan.products); mmRenderPlan();
+    mmMessage(mmPlan.connected ? 'Preview ready. Only ready entries will be posted; completed entries are skipped.' : mmPlan.connection_error, mmPlan.connected ? '' : 'error');
+  } catch (error) { mmMessage(error.message, 'error'); }
+  finally { mmControls(false); }
+});
+$('mmSync').addEventListener('click', async () => {
+  if (!mmPlan?.connected || mmBusy) return;
+  const token = mmPlan.token; mmPlan = null; mmControls(true); mmMessage('Posting balanced journals to Money Master…');
+  try {
+    const result = await mmApi('/sync', { token });
+    $('mmPreview').innerHTML = '';
+    mmMessage(`Sync complete. ${result.posted} entries imported as Pending; ${result.restored || 0} restored as Pending; ${result.updated || 0} memos updated and set Pending; ${result.rebuilt || 0} deleted refunds recreated; ${result.already_synced} entries were already synced. Review Pending journals in Money Master.`, 'success');
+  } catch (error) { $('mmPreview').innerHTML = ''; mmMessage(error.message, 'error'); }
+  finally { mmControls(false); }
+});
+$('mmClose').addEventListener('click', () => $('mmDialog').close());
+$('mmDialog').addEventListener('cancel', (event) => { if (mmBusy) event.preventDefault(); });
 
 load();
 setInterval(() => load(), 60_000);
