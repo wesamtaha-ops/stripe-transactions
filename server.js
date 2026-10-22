@@ -855,9 +855,36 @@ function mmRows(user, transactions) {
   return scopeFor(user, transactions).rows.filter((row) => !row.product_names.some((name) => String(name || '').toLowerCase().startsWith('sentink plus')));
 }
 
+function isLoopbackHost(host) {
+  const name = String(host || '').toLowerCase().replace(/:\d+$/, '');
+  const bare = name.startsWith('[') && name.endsWith(']') ? name.slice(1, -1) : name;
+  return bare === '127.0.0.1' || bare === 'localhost' || bare === '::1';
+}
+
+// Apache terminates TLS and may rewrite Host to this process. The browser still
+// sends Origin: https://<public host>. Compare hosts, and when Host is loopback
+// use the last X-Forwarded-Host, which the proxy appends after any client value.
+function dashboardHost(req) {
+  const host = String(req.headers.host || '');
+  if (!isLoopbackHost(host)) return host;
+  const forwarded = String(req.headers['x-forwarded-host'] || '').split(',').map((part) => part.trim()).filter(Boolean);
+  return forwarded.at(-1) || host;
+}
+
+function postedFromDashboard(req) {
+  if (!req.headers['content-type']?.startsWith('application/json')) return false;
+  const header = req.headers.origin;
+  if (!header) return true;
+  let origin;
+  try { origin = new URL(header); } catch { return false; }
+  if (origin.protocol !== 'http:' && origin.protocol !== 'https:') return false;
+  const host = dashboardHost(req).trim().toLowerCase();
+  return host === origin.host.toLowerCase() || host.replace(/:(80|443)$/, '') === origin.hostname.toLowerCase();
+}
+
 async function handleMoneyMaster(req, res, url, user) {
   if (user.name !== MM_USER) return send(res, 403, { error: 'Money Master sync is available to the configured Sentink user only.' });
-  if (req.method === 'POST' && (!req.headers['content-type']?.startsWith('application/json') || (req.headers.origin && req.headers.origin !== url.origin))) {
+  if (req.method === 'POST' && !postedFromDashboard(req)) {
     return send(res, 403, { error: 'Use the sync controls in this dashboard.' });
   }
   if (url.pathname === '/api/money-master' && req.method === 'GET') {

@@ -98,6 +98,10 @@ test('authenticated API: complete history, scoped mappings, preview, partial fai
   assert.equal((await fetch(`${url}/api/money-master`)).status, 401);
   assert.equal((await api('', undefined, { Cookie: admin })).status, 403);
   assert.equal((await api('/preview', {}, { Origin: 'https://untrusted.example' })).status, 403);
+  const listenHost = new URL(url).host;
+  assert.equal((await api('/mappings', { prod_starter: 31758077, prod_sample: 31758082 }, { Origin: `https://${listenHost}` })).status, 200, 'HTTPS in front of this HTTP server is still this dashboard');
+  assert.equal((await api('/mappings', { prod_starter: 31758077, prod_sample: 31758082 }, { Origin: 'https://stripe.cood.ai', 'X-Forwarded-Host': 'stripe.cood.ai' })).status, 200, 'loopback Host uses the proxy public host');
+  assert.equal((await api('/preview', {}, { Origin: 'https://evil.example', 'X-Forwarded-Host': `evil.example, ${listenHost}` })).status, 403, 'a client-supplied forwarded host cannot replace the proxy host');
   const config = await api('');
   assert.equal(config.status, 200);
   assert.deepEqual(config.body.products.map((p) => p.name).sort(), ['Buying samples', 'Sentink Starter']);
